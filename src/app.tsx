@@ -8,16 +8,17 @@ import {
     Card,
     CardBody,
     CardTitle,
+    Divider,
     Form,
     FormGroup,
     Grid,
     GridItem,
     Page,
     PageSection,
+    Spinner,
     TextArea,
     TextInput,
     Title,
-    Divider
 } from '@patternfly/react-core';
 
 import {
@@ -93,6 +94,11 @@ export const Application = () => {
     };
 
     const handleSaveJob = async () => {
+        if (!keyId || !appKey || !bucket || !folder) {
+            setOutput(_('All fields are required.'));
+            return;
+        }
+
         const newJob: Job = { keyId, appKey, bucket, folder };
 
         let updatedJobs;
@@ -167,6 +173,22 @@ export const Application = () => {
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
                     <CardBody>
+
+                        {editIndex !== null && (
+                            <Alert
+                                variant="info"
+                                title={_('Editing existing job')}
+                                isInline
+                                style={{ marginTop: '1rem', marginBottom: '1rem' }}
+                            />
+                        )}
+                        {isRunning && (
+                            <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                                <Spinner size="md" isSVG />
+                                <span style={{ marginLeft: '0.5rem' }}>{_('Running...')}</span>
+                            </div>
+                        )}
+
                         <Form isHorizontal>
                             <Grid hasGutter>
                                 <GridItem span={6}>
