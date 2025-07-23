@@ -14,15 +14,22 @@ import {
     TextArea,
     TextInput,
     Title,
-    Divider,
-    List,
-    ListItem
+    Divider
 } from '@patternfly/react-core';
+import {
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td
+} from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
 
 const _ = cockpit.gettext;
-const JOBS_FILE = cockpit.user() + '/.config/backblaze-b2/jobs.json';
+const JOBS_DIR = '/etc/backblaze-b2';
+const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
 
 type Job = {
     keyId: string;
@@ -44,24 +51,49 @@ export const Application = () => {
     }, []);
 
     const loadJobs = () => {
-        cockpit.file(JOBS_FILE).read()
+        cockpit.file(JOBS_FILE, { superuser: 'require' }).read()
             .then(content => {
                 try {
                     setJobs(JSON.parse(content));
                 } catch {
                     setJobs([]);
+                    setOutput(_('Failed to parse jobs file.'));
                 }
             })
             .catch(() => {
                 setJobs([]);
+                setOutput(_('No jobs found or file not readable.'));
             });
     };
 
     const saveJobs = (newJobs: Job[]) => {
-        cockpit.file(JOBS_FILE, { superuser: false }).replace(JSON.stringify(newJobs, null, 2))
-            .done(() => setJobs(newJobs))
+        const jobData = JSON.stringify(newJobs, null, 2);
+
+        cockpit.spawn(['mkdir', '-p', JOBS_DIR], { superuser: 'require' })
+            .done(() => {
+                cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(jobData)
+                    .done(() => {
+                        cockpit.spawn(['chown', 'root:backblaze', JOBS_FILE], { superuser: 'require' })
+                            .done(() => {
+                                cockpit.spawn(['chmod', '660', JOBS_FILE], { superuser: 'require' })
+                                    .done(() => {
+                                        setJobs(newJobs);
+                                        setOutput(_('Job saved.'));
+                                    })
+                                    .fail(err => {
+                                        setOutput(_('Job saved but failed to set permissions: ') + (err.message || err));
+                                    });
+                            })
+                            .fail(err => {
+                                setOutput(_('Job saved but failed to set ownership: ') + (err.message || err));
+                            });
+                    })
+                    .fail(err => {
+                        setOutput(_('Error saving job (write failed): ') + (err.message || err));
+                    });
+            })
             .fail(err => {
-                setOutput(_('Error saving job: ') + (err.message || err));
+                setOutput(_('Error saving job (directory create failed): ') + (err.message || err));
             });
     };
 
@@ -69,7 +101,6 @@ export const Application = () => {
         const newJob: Job = { keyId, appKey, bucket, folder };
         const updatedJobs = [...jobs, newJob];
         saveJobs(updatedJobs);
-        setOutput(_('Job saved.'));
     };
 
     const runBackup = () => {
@@ -138,13 +169,27 @@ export const Application = () => {
                         <Title headingLevel="h2" size="lg">
                             {_('Saved Jobs')}
                         </Title>
-                        <List>
-                            {jobs.map((job, index) => (
-                                <ListItem key={index}>
-                                    <strong>{job.bucket}</strong> → {job.folder}
-                                </ListItem>
-                            ))}
-                        </List>
+
+                        <Table aria-label="Saved Jobs Table">
+                            <Thead>
+                                <Tr>
+                                    <Th>{_('Bucket')}</Th>
+                                    <Th>{_('Folder')}</Th>
+                                    <Th>{_('Key ID')}</Th>
+                                    <Th>{_('Actions')}</Th>
+                                </Tr>
+                            </Thead>
+                            <Tbody>
+                                {jobs.map((job, index) => (
+                                    <Tr key={index}>
+                                        <Td>{job.bucket}</Td>
+                                        <Td>{job.folder}</Td>
+                                        <Td>{job.keyId}</Td>
+                                        <Td>–</Td>
+                                    </Tr>
+                                ))}
+                            </Tbody>
+                        </Table>
                     </CardBody>
                 </Card>
             </PageSection>
