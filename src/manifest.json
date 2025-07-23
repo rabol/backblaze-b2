@@ -3,7 +3,7 @@
         "cockpit": "137"
     },
     "tools": {
-        "backblaze-b2": {
+        "index": {
             "label": "Backblaze B2 Backup",
             "description": "Backup to Backblaze B2",
             "icon": "cloud-upload"
