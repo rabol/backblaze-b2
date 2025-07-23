@@ -1,3 +1,6 @@
+// src/app.tsx
+// Main application component for Backblaze B2 Backup UI
+
 import React, { useState, useEffect } from 'react';
 import {
     Alert,
@@ -51,75 +54,84 @@ export const Application = () => {
         loadJobs();
     }, []);
 
-    const loadJobs = () => {
-        cockpit.file(JOBS_FILE, { superuser: true }).read()
-            .then(content => {
-                try {
-                    const parsedJobs: Job[] = JSON.parse(content);
-                    const decryptedJobs = parsedJobs.map(job => ({
-                        ...job,
-                        keyId: simpleDecrypt(job.keyId),
-                        appKey: simpleDecrypt(job.appKey)
-                    }));
-                    setJobs(decryptedJobs);
-                } catch {
-                    setJobs([]);
-                }
-            })
-            .catch(() => {
-                setJobs([]);
-            });
+    const loadJobs = async () => {
+        try {
+            const content = await cockpit.file(JOBS_FILE, { superuser: true }).read();
+            const parsedJobs: Job[] = JSON.parse(content);
+
+            const decryptedJobs: Job[] = await Promise.all(
+                parsedJobs.map(async (job) => ({
+                    ...job,
+                    keyId: await simpleDecrypt(job.keyId),
+                    appKey: await simpleDecrypt(job.appKey)
+                }))
+            );
+
+            setJobs(decryptedJobs);
+        } catch {
+            setJobs([]);
+        }
     };
 
-    const saveJobs = (newJobs: Job[]) => {
-        const encryptedJobs = newJobs.map(job => ({
-            ...job,
-            keyId: simpleEncrypt(job.keyId),
-            appKey: simpleEncrypt(job.appKey)
-        }));
+    const saveJobs = async (newJobs: Job[]) => {
+        try {
+            const encryptedJobs: Job[] = await Promise.all(
+                newJobs.map(async (job) => ({
+                    ...job,
+                    keyId: await simpleEncrypt(job.keyId),
+                    appKey: await simpleEncrypt(job.appKey)
+                }))
+            );
 
-        cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(encryptedJobs, null, 2))
-            .done(() => setJobs(newJobs))
-            .fail(err => {
-                setOutput(_('Error saving job: ') + (err.message || err));
-            });
+            await cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(encryptedJobs, null, 2));
+            setJobs(newJobs);
+        } catch (err: any) {
+            setOutput(_('Error saving job: ') + (err.message || err));
+        }
     };
 
-    const handleSaveJob = () => {
+    const handleSaveJob = async () => {
         const newJob: Job = { keyId, appKey, bucket, folder };
         const updatedJobs = [...jobs, newJob];
-        saveJobs(updatedJobs);
+        await saveJobs(updatedJobs);
         setOutput(_('Job saved.'));
     };
 
-    const handleDeleteJob = (index: number) => {
-        if (!window.confirm(_('Are you sure you want to delete this job?'))) {
-            return;
-        }
+    const handleDeleteJob = async (index: number) => {
+        if (!window.confirm(_('Are you sure you want to delete this job?'))) return;
         const updatedJobs = [...jobs];
         updatedJobs.splice(index, 1);
-        saveJobs(updatedJobs);
+        await saveJobs(updatedJobs);
         setOutput(_('Job deleted.'));
     };
 
-    const handleRunJob = (job: Job) => {
+    const handleRunJob = async (job: Job) => {
         setOutput(_('Running backup...'));
-        cockpit
-            .spawn([
-                '/usr/libexec/backblaze-b2/sync.sh',
-                simpleEncrypt(job.keyId),
-                simpleEncrypt(job.appKey),
-                job.bucket,
-                job.folder
-            ], {
-                superuser: 'require'
-            })
-            .done((data: string) => {
-                setOutput(data);
-            })
-            .fail((err: any) => {
-                setOutput(_('Backup failed: ') + (err.message || err));
-            });
+
+        try {
+            const decryptedKeyId = await simpleDecrypt(job.keyId);
+            const decryptedAppKey = await simpleDecrypt(job.appKey);
+
+            cockpit
+                .spawn(
+                    [
+                        '/usr/libexec/backblaze-b2/sync.sh',
+                        decryptedKeyId,
+                        decryptedAppKey,
+                        job.bucket,
+                        job.folder
+                    ],
+                    { superuser: 'require' }
+                )
+                .done((data: string) => {
+                    setOutput(data);
+                })
+                .fail((err: any) => {
+                    setOutput(_('Backup failed: ') + (err.message || err));
+                });
+        } catch (err: any) {
+            setOutput(_('Error decrypting job: ') + (err.message || err));
+        }
     };
 
     return (
