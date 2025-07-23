@@ -29,7 +29,7 @@ export const Application = () => {
         setOutput(_('Running backup...'));
 
         cockpit
-            .spawn(['/usr/libexec/cockpit-backblaze-b2/sync.sh', keyId, appKey, bucket, folder], {
+            .spawn(['/usr/libexec/backblaze-b2/sync.sh', keyId, appKey, bucket, folder], {
                 superuser: 'require'
             })
             .done((data: string) => {

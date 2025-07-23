@@ -1,7 +1,7 @@
-# cockpit-backblaze-b2 Danish translations
+# backblaze-b2 Danish translations
 msgid ""
 msgstr ""
-"Project-Id-Version: cockpit-backblaze-b2 1.0\n"
+"Project-Id-Version: backblaze-b2 1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-03-09 16:09+0100\n"
 "PO-Revision-Date: 2025-07-23 12:00+0200\n"
@@ -21,15 +21,15 @@ msgstr "Cockpit Startskabelon"
 msgid "Running on $0"
 msgstr "Kører på $0"
 
-#: org.cockpit-project.starter-kit.metainfo.xml:6
+#: org.cockpit-project.backblaze-b2.metainfo.xml:6
 msgid "Scaffolding for a cockpit module"
 msgstr "Skabelon til et Cockpit-modul"
 
-#: org.cockpit-project.starter-kit.metainfo.xml:8
+#: org.cockpit-project.backblaze-b2.metainfo.xml:8
 msgid "Scaffolding for a cockpit module."
 msgstr "Skabelon til et Cockpit-modul."
 
-#: src/manifest.json:0 org.cockpit-project.starter-kit.metainfo.xml:5
+#: src/manifest.json:0 org.cockpit-project.backblaze-b2.metainfo.xml:5
 msgid "Starter Kit"
 msgstr "Startskabelon"
 

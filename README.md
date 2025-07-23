@@ -18,8 +18,8 @@ On Fedora:
 These commands check out the source and build it into the `dist/` directory:
 
 ```
-git clone https://github.com/rabol/cockpit-backblaze-b2.git
-cd cockpit-backblaze-b2
+git clone https://github.com/rabol/backblaze-b2.git
+cd backblaze-b2
 make
 ```
 
@@ -39,7 +39,7 @@ this manually:
 
 ```
 mkdir -p ~/.local/share/cockpit
-ln -s `pwd`/dist ~/.local/share/cockpit/starter-kit
+ln -s `pwd`/dist ~/.local/share/cockpit/backblaze-b2
 ```
 
 After changing the code and running `make` again, reload the Cockpit page in
@@ -70,7 +70,7 @@ set to upload code changes to `~/.local/share/cockpit/` instead of
 To "uninstall" the locally installed version, run `make devel-uninstall`, or
 remove manually the symlink:
 
-    rm ~/.local/share/cockpit/starter-kit
+    rm ~/.local/share/cockpit/backblaze-b2
 
 # Running eslint
 
@@ -136,7 +136,7 @@ These tests can be run in [Cirrus CI](https://cirrus-ci.org/), on their free
 [Linux Containers](https://cirrus-ci.org/guide/linux/) environment which
 explicitly supports `/dev/kvm`. Please see [Quick
 Start](https://cirrus-ci.org/guide/quick-start/) how to set up Cirrus CI for
-your project after forking from starter-kit.
+your project after forking from backblaze-b2.
 
 The included [.cirrus.yml](./.cirrus.yml) runs the integration tests for two
 operating systems (Fedora and CentOS 8). Note that if/once your project grows
@@ -194,7 +194,7 @@ see [configuration file](.github/dependabot.yml).
 
 # Further reading
 
- * The [Starter Kit announcement](https://cockpit-project.org/blog/cockpit-starter-kit.html)
+ * The [Starter Kit announcement](https://cockpit-project.org/blog/backblaze-b2.html)
    blog post explains the rationale for this project.
  * [Cockpit Deployment and Developer documentation](https://cockpit-project.org/guide/latest/)
  * [Make your project easily discoverable](https://cockpit-project.org/blog/making-a-cockpit-application.html)

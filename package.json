@@ -1,9 +1,9 @@
 {
-  "name": "cockpit-backblaze-b2",
+  "name": "backblaze-b2",
   "description": "Cockpit plugin for Backblaze B2 backups",
   "type": "module",
   "main": "index.js",
-  "repository": "https://github.com/rabol/cockpit-backblaze-b2",
+  "repository": "https://github.com/rabol/backblaze-b2",
   "author": "Steen Rabol",
   "license": "LGPL-2.1",
   "engines": {

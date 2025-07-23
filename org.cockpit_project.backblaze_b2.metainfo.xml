@@ -9,8 +9,8 @@
             from their server to Backblaze B2 buckets using the B2 CLI.
         </p>
     </description>
-    <url type="homepage">https://github.com/rabol/cockpit-backblaze-b2</url>
+    <url type="homepage">https://github.com/rabol/backblaze-b2</url>
     <provides>
-        <binary>cockpit-backblaze-b2</binary>
+        <binary>backblaze-b2</binary>
     </provides>
 </component>
