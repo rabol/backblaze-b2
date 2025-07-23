@@ -1,6 +1,4 @@
 // src/app.tsx
-// Main application component for Backblaze B2 Backup UI
-
 import React, { useState, useEffect } from 'react';
 import {
     Alert,
@@ -8,17 +6,17 @@ import {
     Card,
     CardBody,
     CardTitle,
-    Divider,
     Form,
     FormGroup,
     Grid,
     GridItem,
     Page,
     PageSection,
-    Spinner,
     TextArea,
     TextInput,
     Title,
+    Divider,
+    Spinner
 } from '@patternfly/react-core';
 
 import {
@@ -152,11 +150,11 @@ export const Application = () => {
                 )
                 .done((data: string) => {
                     setOutput(data);
-                    setIsRunning(false);
-                    document.body.style.cursor = 'default';
                 })
                 .fail((err: any) => {
                     setOutput(_('Backup failed: ') + (err.message || err));
+                })
+                .always(() => {
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 });
@@ -173,19 +171,9 @@ export const Application = () => {
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
                     <CardBody>
-
                         {editIndex !== null && (
-                            <Alert
-                                variant="info"
-                                title={_('Editing existing job')}
-                                isInline
-                                style={{ marginTop: '1rem', marginBottom: '1rem' }}
-                            />
-                        )}
-                        {isRunning && (
-                            <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-                                <Spinner size="md" isSVG />
-                                <span style={{ marginLeft: '0.5rem' }}>{_('Running...')}</span>
+                            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                                <Alert variant="info" title={_('Editing existing job')} isInline />
                             </div>
                         )}
 
@@ -219,15 +207,49 @@ export const Application = () => {
                                 </GridItem>
                             </Grid>
 
-                            <Button
-                                variant="primary"
-                                onClick={handleSaveJob}
-                                style={{ marginTop: '10px' }}
-                                isDisabled={isRunning}
-                            >
-                                {_('Save Job')}
-                            </Button>
+                            <div style={{ marginTop: '10px' }}>
+                                {editIndex !== null ? (
+                                    <>
+                                        <Button
+                                            variant="primary"
+                                            onClick={handleSaveJob}
+                                            style={{ marginRight: '10px' }}
+                                            isDisabled={isRunning}
+                                        >
+                                            {_('Save Changes')}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => {
+                                                setKeyId('');
+                                                setAppKey('');
+                                                setBucket('');
+                                                setFolder('/tank_ssd/shared');
+                                                setEditIndex(null);
+                                                setOutput(_('Edit cancelled.'));
+                                            }}
+                                            isDisabled={isRunning}
+                                        >
+                                            {_('Cancel')}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleSaveJob}
+                                        isDisabled={isRunning}
+                                    >
+                                        {_('Save Job')}
+                                    </Button>
+                                )}
+                            </div>
                         </Form>
+
+                        {isRunning && (
+                            <div style={{ marginTop: '10px' }}>
+                                <Spinner size="md" isSVG />
+                            </div>
+                        )}
 
                         <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
                             <TextArea id="output" value={output} isReadOnly rows={10} />
