@@ -98,29 +98,26 @@ Ensure it’s executable and accessible by the Cockpit backend.
 
 ```bash
 #!/bin/bash
+
 set -euo pipefail
 
-KEY_ID="$1"
-APP_KEY="$2"
-BUCKET="$3"
-LOCAL_FOLDER="$4"
+KEY_ID=$1
+APP_KEY=$2
+BUCKET=$3
+FOLDER=$4
 
-if [[ -z "$KEY_ID" || -z "$APP_KEY" || -z "$BUCKET" || -z "$LOCAL_FOLDER" ]]; then
-    echo "Error: Missing required arguments." >&2
+# Authorize account using updated syntax
+if ! b2 account authorize "$KEY_ID" "$APP_KEY"; then
+    echo "ERROR: Failed to authorize with Backblaze B2. Check your Key ID and App Key."
     exit 1
 fi
 
-# Use a temporary file for B2's credentials (so it's not saved globally)
-export B2_ACCOUNT_INFO="$(mktemp)"
-
-# Clean up on exit
-trap 'rm -f "$B2_ACCOUNT_INFO"' EXIT
-
-# Authorize using passed credentials
-b2 authorize-account "$KEY_ID" "$APP_KEY"
-
-# Now sync the folder to the bucket
-b2 sync "$LOCAL_FOLDER" "b2://$BUCKET"
+# Sync folder using correct --skip-newer flag
+if ! b2 sync --delete --skip-newer "$FOLDER" "b2://$BUCKET/$(hostname)"; then
+    echo "ERROR: Sync failed. Check folder path, bucket name, and B2 credentials."
+    exit 1
+fi
 
 echo "Backup completed successfully."
+
 ```
