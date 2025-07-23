@@ -7,6 +7,8 @@ import {
     CardTitle,
     Form,
     FormGroup,
+    Grid,
+    GridItem,
     Page,
     PageSection,
     TextArea,
@@ -47,18 +49,35 @@ export const Application = () => {
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
                     <CardBody>
                         <Form isHorizontal>
-                            <FormGroup label={_('Application Key ID')} fieldId="keyId">
-                                <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
-                            </FormGroup>
-                            <FormGroup label={_('Application Key')} fieldId="appKey">
-                                <TextInput id="appKey" type="password" value={appKey} onChange={(_, v) => setAppKey(v)} />
-                            </FormGroup>
-                            <FormGroup label={_('Bucket Name')} fieldId="bucket">
-                                <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
-                            </FormGroup>
-                            <FormGroup label={_('Local Folder to Backup')} fieldId="folder">
-                                <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
-                            </FormGroup>
+                            <Grid hasGutter>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Application Key ID')} fieldId="keyId">
+                                        <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Application Key')} fieldId="appKey">
+                                        <TextInput
+                                            id="appKey"
+                                            type="password"
+                                            value={appKey}
+                                            onChange={(_, v) => setAppKey(v)}
+                                        />
+                                    </FormGroup>
+                                </GridItem>
+
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Bucket Name')} fieldId="bucket">
+                                        <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Local Folder to Backup')} fieldId="folder">
+                                        <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                            </Grid>
+
                             <Button variant="primary" onClick={runBackup}>
                                 {_('Run Backup')}
                             </Button>
