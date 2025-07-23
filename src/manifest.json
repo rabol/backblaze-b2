@@ -2,10 +2,11 @@
     "requires": {
         "cockpit": "137"
     },
-
     "tools": {
-        "index": {
-            "label": "Starter Kit"
+        "backblaze-b2": {
+            "label": "Backblaze B2 Backup",
+            "description": "Backup to Backblaze B2",
+            "icon": "cloud-upload"
         }
     }
 }

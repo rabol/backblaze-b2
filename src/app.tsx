@@ -1,48 +1,75 @@
-/*
- * This file is part of Cockpit.
- *
- * Copyright (C) 2017 Red Hat, Inc.
- *
- * Cockpit is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2.1 of the License, or
- * (at your option) any later version.
- *
- * Cockpit is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
- */
-
-import React, { useEffect, useState } from 'react';
-import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import React, { useState } from 'react';
+import {
+    Alert,
+    Button,
+    Card,
+    CardBody,
+    CardTitle,
+    Form,
+    FormGroup,
+    Page,
+    PageSection,
+    TextArea,
+    TextInput,
+    Title
+} from '@patternfly/react-core';
 
 import cockpit from 'cockpit';
 
 const _ = cockpit.gettext;
 
 export const Application = () => {
-    const [hostname, setHostname] = useState(_("Unknown"));
+    const [keyId, setKeyId] = useState('');
+    const [appKey, setAppKey] = useState('');
+    const [bucket, setBucket] = useState('');
+    const [folder, setFolder] = useState('/tank_ssd/shared');
+    const [output, setOutput] = useState('');
 
-    useEffect(() => {
-        const hostname = cockpit.file('/etc/hostname');
-        hostname.watch(content => setHostname(content?.trim() ?? ""));
-        return hostname.close;
-    }, []);
+    const runBackup = () => {
+        setOutput(_('Running backup...'));
+
+        cockpit
+            .spawn(['/usr/libexec/cockpit-backblaze-b2/sync.sh', keyId, appKey, bucket, folder], {
+                superuser: 'require'
+            })
+            .done((data: string) => {
+                setOutput(data);
+            })
+            .fail((err: any) => {
+                setOutput(_('Error: ') + (err.message || err));
+            });
+    };
 
     return (
-        <Card>
-            <CardTitle>Starter Kit</CardTitle>
-            <CardBody>
-                <Alert
-                    variant="info"
-                    title={ cockpit.format(_("Running on $0"), hostname) }
-                />
-            </CardBody>
-        </Card>
+        <Page>
+            <PageSection variant="light">
+                <Card>
+                    <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
+                    <CardBody>
+                        <Form isHorizontal>
+                            <FormGroup label={_('Application Key ID')} fieldId="keyId">
+                                <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
+                            </FormGroup>
+                            <FormGroup label={_('Application Key')} fieldId="appKey">
+                                <TextInput id="appKey" type="password" value={appKey} onChange={(_, v) => setAppKey(v)} />
+                            </FormGroup>
+                            <FormGroup label={_('Bucket Name')} fieldId="bucket">
+                                <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
+                            </FormGroup>
+                            <FormGroup label={_('Local Folder to Backup')} fieldId="folder">
+                                <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
+                            </FormGroup>
+                            <Button variant="primary" onClick={runBackup}>
+                                {_('Run Backup')}
+                            </Button>
+                        </Form>
+
+                        <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
+                            <TextArea id="output" value={output} isReadOnly rows={10} />
+                        </FormGroup>
+                    </CardBody>
+                </Card>
+            </PageSection>
+        </Page>
     );
 };
