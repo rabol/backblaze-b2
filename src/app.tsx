@@ -17,8 +17,7 @@ import {
     TextArea,
     TextInput,
     Title,
-    Divider,
-    Spinner
+    Divider
 } from '@patternfly/react-core';
 
 import {
@@ -50,7 +49,7 @@ export const Application = () => {
     const [folder, setFolder] = useState('/tank_ssd/shared');
     const [output, setOutput] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editIndex, setEditIndex] = useState<number | null>(null);
     const [isRunning, setIsRunning] = useState(false);
 
     useEffect(() => {
@@ -95,11 +94,11 @@ export const Application = () => {
 
     const handleSaveJob = async () => {
         const newJob: Job = { keyId, appKey, bucket, folder };
-        let updatedJobs: Job[];
 
-        if (editingIndex !== null) {
+        let updatedJobs;
+        if (editIndex !== null) {
             updatedJobs = [...jobs];
-            updatedJobs[editingIndex] = newJob;
+            updatedJobs[editIndex] = newJob;
         } else {
             updatedJobs = [...jobs, newJob];
         }
@@ -107,12 +106,12 @@ export const Application = () => {
         await saveJobs(updatedJobs);
         setOutput(_('Job saved.'));
 
-        // Clear form inputs after saving
+        // Clear form
         setKeyId('');
         setAppKey('');
         setBucket('');
         setFolder('/tank_ssd/shared');
-        setEditingIndex(null);
+        setEditIndex(null);
     };
 
     const handleDeleteJob = async (index: number) => {
@@ -124,8 +123,11 @@ export const Application = () => {
     };
 
     const handleRunJob = async (job: Job) => {
+        if (!window.confirm(_('Are you sure you want to run this backup job?'))) return;
+
         setOutput(_('Running backup...'));
         setIsRunning(true);
+        document.body.style.cursor = 'wait';
 
         try {
             const decryptedKeyId = await simpleDecrypt(job.keyId);
@@ -145,19 +147,22 @@ export const Application = () => {
                 .done((data: string) => {
                     setOutput(data);
                     setIsRunning(false);
+                    document.body.style.cursor = 'default';
                 })
                 .fail((err: any) => {
                     setOutput(_('Backup failed: ') + (err.message || err));
                     setIsRunning(false);
+                    document.body.style.cursor = 'default';
                 });
         } catch (err: any) {
             setOutput(_('Error decrypting job: ') + (err.message || err));
             setIsRunning(false);
+            document.body.style.cursor = 'default';
         }
     };
 
     return (
-        <Page style={{ cursor: isRunning ? 'wait' : 'default' }}>
+        <Page className="no-masthead-sidebar" isContentFilled>
             <PageSection variant="light">
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
@@ -192,14 +197,18 @@ export const Application = () => {
                                 </GridItem>
                             </Grid>
 
-                            <Button variant="primary" onClick={handleSaveJob} style={{ marginTop: '10px' }}>
+                            <Button
+                                variant="primary"
+                                onClick={handleSaveJob}
+                                style={{ marginTop: '10px' }}
+                                isDisabled={isRunning}
+                            >
                                 {_('Save Job')}
                             </Button>
                         </Form>
 
                         <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
                             <TextArea id="output" value={output} isReadOnly rows={10} />
-                            {isRunning && <Spinner size="lg" style={{ marginTop: '10px' }} />}
                         </FormGroup>
 
                         <Divider style={{ margin: '20px 0' }} />
@@ -207,51 +216,58 @@ export const Application = () => {
                             {_('Saved Jobs')}
                         </Title>
 
-                        <Table variant="compact" style={{ marginTop: '10px' }}>
-                            <Thead>
-                                <Tr>
-                                    <Th>{_('Bucket')}</Th>
-                                    <Th>{_('Folder')}</Th>
-                                    <Th>{_('Actions')}</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {jobs.map((job, index) => (
-                                    <Tr key={index}>
-                                        <Td>{job.bucket}</Td>
-                                        <Td>{job.folder}</Td>
-                                        <Td>
-                                            <Button
-                                                variant="primary"
-                                                onClick={() => handleRunJob(job)}
-                                                style={{ marginRight: '8px' }}
-                                            >
-                                                {_('Run')}
-                                            </Button>
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => {
-                                                    setKeyId(job.keyId);
-                                                    setAppKey(job.appKey);
-                                                    setBucket(job.bucket);
-                                                    setFolder(job.folder);
-                                                    setEditingIndex(index);
-                                                }}
-                                                style={{ marginRight: '8px' }}
-                                            >
-                                                {_('Edit')}
-                                            </Button>
-                                            <Button
-                                                variant="danger"
-                                                onClick={() => handleDeleteJob(index)}
-                                            >
-                                                {_('Delete')}
-                                            </Button>
-                                        </Td>
-                                    </Tr>
-                                ))}
-                            </Tbody>
-                        </Table>
+                        <Grid hasGutter style={{ marginTop: '10px' }}>
+                            <GridItem span={12}>
+                                <Table variant="compact" className="pf-m-sticky-header" style={{ width: '100%' }}>
+                                    <Thead>
+                                        <Tr>
+                                            <Th>{_('Bucket')}</Th>
+                                            <Th>{_('Folder')}</Th>
+                                            <Th style={{ textAlign: 'right' }}>{_('Actions')}</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {jobs.map((job, index) => (
+                                            <Tr key={index}>
+                                                <Td>{job.bucket}</Td>
+                                                <Td>{job.folder}</Td>
+                                                <Td style={{ textAlign: 'right' }}>
+                                                    <Button
+                                                        variant="primary"
+                                                        onClick={() => handleRunJob(job)}
+                                                        style={{ marginRight: '8px' }}
+                                                        isDisabled={isRunning}
+                                                    >
+                                                        {_('Run')}
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => {
+                                                            setKeyId(job.keyId);
+                                                            setAppKey(job.appKey);
+                                                            setBucket(job.bucket);
+                                                            setFolder(job.folder);
+                                                            setEditIndex(index);
+                                                        }}
+                                                        style={{ marginRight: '8px' }}
+                                                        isDisabled={isRunning}
+                                                    >
+                                                        {_('Edit')}
+                                                    </Button>
+                                                    <Button
+                                                        variant="danger"
+                                                        onClick={() => handleDeleteJob(index)}
+                                                        isDisabled={isRunning}
+                                                    >
+                                                        {_('Delete')}
+                                                    </Button>
+                                                </Td>
+                                            </Tr>
+                                        ))}
+                                    </Tbody>
+                                </Table>
+                            </GridItem>
+                        </Grid>
                     </CardBody>
                 </Card>
             </PageSection>
