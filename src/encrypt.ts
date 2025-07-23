@@ -1,3 +1,5 @@
+// src/encrypt.ts
+// Simple encryption and decryption functions using AES-CBC
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
