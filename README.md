@@ -1,17 +1,16 @@
 # Cockpit Backblaze B2
 
 This is a simple Backblaze B2 backup module for [Cockpit](https://cockpit-project.org).
+It uses [Cockpit Starter Kit](https://github.com/cockpit-project/starter-kit) as a base
 
 ## Downloading the Module
 
 Clone this repository to your system:
 
 ```sh
-git clone https://github.com/YOUR_USERNAME/backblaze-b2.git
+git clone https://github.com/rabol/backblaze-b2.git
 cd backblaze-b2
 ```
-
-Replace `YOUR_USERNAME` with the actual GitHub user or organization name.
 
 ## Development Dependencies
 
