@@ -1,208 +1,205 @@
-import cockpit from 'cockpit';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Page, PageSection, Title, TextInput, Button, Form, FormGroup, Alert, Flex, FlexItem,
-    Table, Thead, Tbody, Tr, Th, Td
+    Alert,
+    Button,
+    Card,
+    CardBody,
+    CardTitle,
+    Form,
+    FormGroup,
+    Grid,
+    GridItem,
+    Page,
+    PageSection,
+    TextArea,
+    TextInput,
+    Title,
+    Divider
 } from '@patternfly/react-core';
 
-import { encrypt, decrypt } from './encrypt';
+import {
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td
+} from '@patternfly/react-table';
 
-type Job = {
-    applicationKeyId: string;
-    applicationKey: string;
-    bucket: string;
-    localFolder: string;
-};
+import cockpit from 'cockpit';
 
+const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
 
-const App = () => {
-    const [applicationKeyId, setApplicationKeyId] = useState('');
-    const [applicationKey, setApplicationKey] = useState('');
+type Job = {
+    keyId: string;
+    appKey: string;
+    bucket: string;
+    folder: string;
+};
+
+export const Application = () => {
+    const [keyId, setKeyId] = useState('');
+    const [appKey, setAppKey] = useState('');
     const [bucket, setBucket] = useState('');
-    const [localFolder, setLocalFolder] = useState('');
+    const [folder, setFolder] = useState('/tank_ssd/shared');
+    const [output, setOutput] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     useEffect(() => {
         loadJobs();
     }, []);
 
-    const loadJobs = async () => {
-        try {
-            const result = await cockpit.file(JOBS_FILE, { superuser: true }).read();
-            const parsed = JSON.parse(result);
-            const decryptedJobs = parsed.map((job: any) => ({
-                ...job,
-                applicationKeyId: decrypt(job.applicationKeyId),
-                applicationKey: decrypt(job.applicationKey)
-            }));
-            setJobs(decryptedJobs);
-        } catch (err) {
-            console.warn("Could not read jobs:", err);
-        }
+    const loadJobs = () => {
+        cockpit.file(JOBS_FILE, { superuser: true }).read()
+            .then(content => {
+                try {
+                    setJobs(JSON.parse(content));
+                } catch {
+                    setJobs([]);
+                }
+            })
+            .catch(() => {
+                setJobs([]);
+            });
     };
 
-    const saveJobs = async (newJobs: Job[]) => {
-        try {
-            const encryptedJobs = newJobs.map((job) => ({
-                ...job,
-                applicationKeyId: encrypt(job.applicationKeyId),
-                applicationKey: encrypt(job.applicationKey)
-            }));
-            const json = JSON.stringify(encryptedJobs, null, 2);
-
-            // Ensure directory exists
-            await cockpit.spawn(['mkdir', '-p', '/etc/backblaze-b2'], { superuser: true });
-            await cockpit.file(JOBS_FILE, { superuser: true }).replace(json);
-            setSuccess('Job saved successfully.');
-            setJobs(newJobs);
-        } catch (err) {
-            setError('Failed to save job: ' + err);
-        }
+    const saveJobs = (newJobs: Job[]) => {
+        cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(newJobs, null, 2))
+            .done(() => setJobs(newJobs))
+            .fail(err => {
+                setOutput(_('Error saving job: ') + (err.message || err));
+            });
     };
 
-    const handleAddOrUpdate = () => {
-        if (!applicationKeyId || !applicationKey || !bucket || !localFolder) {
-            setError('All fields are required.');
+    const handleSaveJob = () => {
+        const newJob: Job = { keyId, appKey, bucket, folder };
+        const updatedJobs = [...jobs, newJob];
+        saveJobs(updatedJobs);
+        setOutput(_('Job saved.'));
+    };
+
+    const handleDeleteJob = (index: number) => {
+        if (!window.confirm(_('Are you sure you want to delete this job?'))) {
             return;
         }
-
-        const job: Job = { applicationKeyId, applicationKey, bucket, localFolder };
         const updatedJobs = [...jobs];
-
-        if (selectedIndex !== null) {
-            updatedJobs[selectedIndex] = job;
-        } else {
-            updatedJobs.push(job);
-        }
-
+        updatedJobs.splice(index, 1);
         saveJobs(updatedJobs);
-        resetForm();
+        setOutput(_('Job deleted.'));
     };
 
-    const resetForm = () => {
-        setApplicationKeyId('');
-        setApplicationKey('');
-        setBucket('');
-        setLocalFolder('');
-        setSelectedIndex(null);
-        setError('');
-        setSuccess('');
-    };
-
-    const handleDelete = (index: number) => {
-        if (!confirm('Are you sure you want to delete this job?')) return;
-        const updatedJobs = jobs.filter((_, i) => i !== index);
-        saveJobs(updatedJobs);
-    };
-
-    const handleEdit = (index: number) => {
-        const job = jobs[index];
-        setApplicationKeyId(job.applicationKeyId);
-        setApplicationKey(job.applicationKey);
-        setBucket(job.bucket);
-        setLocalFolder(job.localFolder);
-        setSelectedIndex(index);
-    };
-
-    const handleRun = async (index: number) => {
-        const job = jobs[index];
-        try {
-            const result = await cockpit.spawn([
-                '/usr/libexec/backblaze-b2/sync.sh',
-                job.applicationKeyId,
-                job.applicationKey,
-                job.bucket,
-                job.localFolder
-            ], { superuser: true });
-            alert('Backup completed:\n' + result);
-        } catch (err) {
-            alert('Backup failed:\n' + err);
-        }
+    const handleRunJob = (job: Job) => {
+        setOutput(_('Running backup...'));
+        cockpit
+            .spawn(['/usr/libexec/backblaze-b2/sync.sh', job.keyId, job.appKey, job.bucket, job.folder], {
+                superuser: 'require'
+            })
+            .done((data: string) => {
+                setOutput(data);
+            })
+            .fail((err: any) => {
+                setOutput(_('Backup failed: ') + (err.message || err));
+            });
     };
 
     return (
         <Page>
-            <PageSection>
-                <Title headingLevel="h1">Backblaze B2 Backup</Title>
-                <Form>
-                    <FormGroup label="Application ID and Key" isRequired>
-                        <Flex>
-                            <FlexItem flex={{ default: 'flex_1' }}>
-                                <TextInput
-                                    value={applicationKeyId}
-                                    onChange={(_, value) => setApplicationKeyId(value)}
-                                    placeholder="Application Key ID"
-                                />
-                            </FlexItem>
-                            <FlexItem flex={{ default: 'flex_1' }}>
-                                <TextInput
-                                    value={applicationKey}
-                                    onChange={(_, value) => setApplicationKey(value)}
-                                    placeholder="Application Key"
-                                    type="password"
-                                />
-                            </FlexItem>
-                        </Flex>
-                    </FormGroup>
-                    <FormGroup label="Bucket and Local Folder" isRequired>
-                        <Flex>
-                            <FlexItem flex={{ default: 'flex_1' }}>
-                                <TextInput
-                                    value={bucket}
-                                    onChange={(_, value) => setBucket(value)}
-                                    placeholder="Bucket Name"
-                                />
-                            </FlexItem>
-                            <FlexItem flex={{ default: 'flex_1' }}>
-                                <TextInput
-                                    value={localFolder}
-                                    onChange={(_, value) => setLocalFolder(value)}
-                                    placeholder="Local Folder"
-                                />
-                            </FlexItem>
-                        </Flex>
-                    </FormGroup>
-                    <Button variant="primary" onClick={handleAddOrUpdate}>
-                        {selectedIndex !== null ? 'Update Job' : 'Add Job'}
-                    </Button>
-                </Form>
-                {error && <Alert variant="danger" title={error} />}
-                {success && <Alert variant="success" title={success} />}
-            </PageSection>
+            <PageSection variant="light">
+                <Card>
+                    <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
+                    <CardBody>
+                        <Form isHorizontal>
+                            <Grid hasGutter>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Application Key ID')} fieldId="keyId">
+                                        <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Application Key')} fieldId="appKey">
+                                        <TextInput
+                                            id="appKey"
+                                            type="password"
+                                            value={appKey}
+                                            onChange={(_, v) => setAppKey(v)}
+                                        />
+                                    </FormGroup>
+                                </GridItem>
 
-            <PageSection>
-                <Title headingLevel="h2">Saved Jobs</Title>
-                <Table variant="compact">
-                    <Thead>
-                        <Tr>
-                            <Th>Key ID</Th>
-                            <Th>Bucket</Th>
-                            <Th>Local Folder</Th>
-                            <Th>Actions</Th>
-                        </Tr>
-                    </Thead>
-                    <Tbody>
-                        {jobs.map((job, index) => (
-                            <Tr key={index}>
-                                <Td>{job.applicationKeyId}</Td>
-                                <Td>{job.bucket}</Td>
-                                <Td>{job.localFolder}</Td>
-                                <Td>
-                                    <Button size="sm" onClick={() => handleRun(index)}>Run</Button>{' '}
-                                    <Button size="sm" onClick={() => handleEdit(index)}>Edit</Button>{' '}
-                                    <Button size="sm" variant="danger" onClick={() => handleDelete(index)}>Delete</Button>
-                                </Td>
-                            </Tr>
-                        ))}
-                    </Tbody>
-                </Table>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Bucket Name')} fieldId="bucket">
+                                        <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Local Folder to Backup')} fieldId="folder">
+                                        <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                            </Grid>
+
+                            <Button variant="primary" onClick={handleSaveJob} style={{ marginTop: '10px' }}>
+                                {_('Save Job')}
+                            </Button>
+                        </Form>
+
+                        <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
+                            <TextArea id="output" value={output} isReadOnly rows={10} />
+                        </FormGroup>
+
+                        <Divider style={{ margin: '20px 0' }} />
+                        <Title headingLevel="h2" size="lg">
+                            {_('Saved Jobs')}
+                        </Title>
+
+                        <Table variant="compact" style={{ marginTop: '10px' }}>
+                            <Thead>
+                                <Tr>
+                                    <Th>{_('Bucket')}</Th>
+                                    <Th>{_('Folder')}</Th>
+                                    <Th>{_('Actions')}</Th>
+                                </Tr>
+                            </Thead>
+                            <Tbody>
+                                {jobs.map((job, index) => (
+                                    <Tr key={index}>
+                                        <Td>{job.bucket}</Td>
+                                        <Td>{job.folder}</Td>
+                                        <Td>
+                                            <Button
+                                                variant="primary"
+                                                onClick={() => handleRunJob(job)}
+                                                style={{ marginRight: '8px' }}
+                                            >
+                                                {_('Run')}
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    setKeyId(job.keyId);
+                                                    setAppKey(job.appKey);
+                                                    setBucket(job.bucket);
+                                                    setFolder(job.folder);
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            >
+                                                {_('Edit')}
+                                            </Button>
+                                            <Button
+                                                variant="danger"
+                                                onClick={() => handleDeleteJob(index)}
+                                            >
+                                                {_('Delete')}
+                                            </Button>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </Tbody>
+                        </Table>
+                    </CardBody>
+                </Card>
             </PageSection>
         </Page>
     );
 };
-
-export default App;
