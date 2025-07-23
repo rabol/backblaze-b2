@@ -17,7 +17,8 @@ import {
     TextArea,
     TextInput,
     Title,
-    Divider
+    Divider,
+    Spinner
 } from '@patternfly/react-core';
 
 import {
@@ -49,6 +50,8 @@ export const Application = () => {
     const [folder, setFolder] = useState('/tank_ssd/shared');
     const [output, setOutput] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [isRunning, setIsRunning] = useState(false);
 
     useEffect(() => {
         loadJobs();
@@ -92,9 +95,24 @@ export const Application = () => {
 
     const handleSaveJob = async () => {
         const newJob: Job = { keyId, appKey, bucket, folder };
-        const updatedJobs = [...jobs, newJob];
+        let updatedJobs: Job[];
+
+        if (editingIndex !== null) {
+            updatedJobs = [...jobs];
+            updatedJobs[editingIndex] = newJob;
+        } else {
+            updatedJobs = [...jobs, newJob];
+        }
+
         await saveJobs(updatedJobs);
         setOutput(_('Job saved.'));
+
+        // Clear form inputs after saving
+        setKeyId('');
+        setAppKey('');
+        setBucket('');
+        setFolder('/tank_ssd/shared');
+        setEditingIndex(null);
     };
 
     const handleDeleteJob = async (index: number) => {
@@ -107,6 +125,7 @@ export const Application = () => {
 
     const handleRunJob = async (job: Job) => {
         setOutput(_('Running backup...'));
+        setIsRunning(true);
 
         try {
             const decryptedKeyId = await simpleDecrypt(job.keyId);
@@ -125,17 +144,20 @@ export const Application = () => {
                 )
                 .done((data: string) => {
                     setOutput(data);
+                    setIsRunning(false);
                 })
                 .fail((err: any) => {
                     setOutput(_('Backup failed: ') + (err.message || err));
+                    setIsRunning(false);
                 });
         } catch (err: any) {
             setOutput(_('Error decrypting job: ') + (err.message || err));
+            setIsRunning(false);
         }
     };
 
     return (
-        <Page>
+        <Page style={{ cursor: isRunning ? 'wait' : 'default' }}>
             <PageSection variant="light">
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
@@ -177,6 +199,7 @@ export const Application = () => {
 
                         <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
                             <TextArea id="output" value={output} isReadOnly rows={10} />
+                            {isRunning && <Spinner size="lg" style={{ marginTop: '10px' }} />}
                         </FormGroup>
 
                         <Divider style={{ margin: '20px 0' }} />
@@ -212,6 +235,7 @@ export const Application = () => {
                                                     setAppKey(job.appKey);
                                                     setBucket(job.bucket);
                                                     setFolder(job.folder);
+                                                    setEditingIndex(index);
                                                 }}
                                                 style={{ marginRight: '8px' }}
                                             >
