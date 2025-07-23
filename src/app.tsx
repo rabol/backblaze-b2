@@ -27,6 +27,7 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
+import { simpleEncrypt, simpleDecrypt } from './encrypt';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
@@ -54,7 +55,13 @@ export const Application = () => {
         cockpit.file(JOBS_FILE, { superuser: true }).read()
             .then(content => {
                 try {
-                    setJobs(JSON.parse(content));
+                    const parsedJobs: Job[] = JSON.parse(content);
+                    const decryptedJobs = parsedJobs.map(job => ({
+                        ...job,
+                        keyId: simpleDecrypt(job.keyId),
+                        appKey: simpleDecrypt(job.appKey)
+                    }));
+                    setJobs(decryptedJobs);
                 } catch {
                     setJobs([]);
                 }
@@ -65,7 +72,13 @@ export const Application = () => {
     };
 
     const saveJobs = (newJobs: Job[]) => {
-        cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(newJobs, null, 2))
+        const encryptedJobs = newJobs.map(job => ({
+            ...job,
+            keyId: simpleEncrypt(job.keyId),
+            appKey: simpleEncrypt(job.appKey)
+        }));
+
+        cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(encryptedJobs, null, 2))
             .done(() => setJobs(newJobs))
             .fail(err => {
                 setOutput(_('Error saving job: ') + (err.message || err));
@@ -92,7 +105,13 @@ export const Application = () => {
     const handleRunJob = (job: Job) => {
         setOutput(_('Running backup...'));
         cockpit
-            .spawn(['/usr/libexec/backblaze-b2/sync.sh', job.keyId, job.appKey, job.bucket, job.folder], {
+            .spawn([
+                '/usr/libexec/backblaze-b2/sync.sh',
+                simpleEncrypt(job.keyId),
+                simpleEncrypt(job.appKey),
+                job.bucket,
+                job.folder
+            ], {
                 superuser: 'require'
             })
             .done((data: string) => {
