@@ -1,6 +1,6 @@
-# Cockpit Starter Kit
+# Cockpit Backblaze B2
 
-Scaffolding for a [Cockpit](https://cockpit-project.org/) module.
+This is a simple Backblaze b2 module module.
 
 # Development dependencies
 
@@ -18,8 +18,8 @@ On Fedora:
 These commands check out the source and build it into the `dist/` directory:
 
 ```
-git clone https://github.com/cockpit-project/starter-kit.git
-cd starter-kit
+git clone https://github.com/rabol/cockpit-backblaze-b2.git
+cd cockpit-backblaze-b2
 make
 ```
 
