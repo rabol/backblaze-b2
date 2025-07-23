@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+    <id>org.cockpit_project.cockpit_backblaze_b2</id>
+    <name>Backblaze B2 Backup</name>
+    <summary>Backup your server folders to Backblaze B2 via Cockpit</summary>
+    <description>
+        <p>
+            This Cockpit extension allows system administrators to back up folders
+            from their server to Backblaze B2 buckets using the B2 CLI.
+        </p>
+    </description>
+    <url type="homepage">https://github.com/rabol/cockpit-backblaze-b2</url>
+    <provides>
+        <binary>cockpit-backblaze-b2</binary>
+    </provides>
+</component>
