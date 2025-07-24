@@ -6,17 +6,17 @@ import {
     Card,
     CardBody,
     CardTitle,
+    Divider,
     Form,
     FormGroup,
     Grid,
     GridItem,
     Page,
     PageSection,
+    Spinner,
     TextArea,
     TextInput,
-    Title,
-    Divider,
-    Spinner
+    Title
 } from '@patternfly/react-core';
 
 import {
@@ -29,10 +29,16 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
-import { simpleEncrypt, simpleDecrypt } from './encrypt';
+import { encryptData, decryptData } from './encrypt';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
+
+// Load key from environment or fallback
+const secretKey = process.env.B2_SECRET_KEY || 'a7f3b9c2d8e6h1k4'; // fallback only used in dev
+if (!process.env.SECRET_KEY) {
+    console.warn('WARNING: Using fallback secret key. Set SECRET_KEY in environment for better security.');
+}
 
 type Job = {
     keyId: string;
@@ -45,7 +51,7 @@ export const Application = () => {
     const [keyId, setKeyId] = useState('');
     const [appKey, setAppKey] = useState('');
     const [bucket, setBucket] = useState('');
-    const [folder, setFolder] = useState('/tank_ssd/shared');
+    const [folder, setFolder] = useState('');
     const [output, setOutput] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
     const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -60,39 +66,39 @@ export const Application = () => {
             const content = await cockpit.file(JOBS_FILE, { superuser: true }).read();
             const parsedJobs: Job[] = JSON.parse(content);
 
-            const decryptedJobs: Job[] = await Promise.all(
-                parsedJobs.map(async (job) => ({
-                    ...job,
-                    keyId: await simpleDecrypt(job.keyId),
-                    appKey: await simpleDecrypt(job.appKey)
-                }))
-            );
+            const decryptedJobs: Job[] = parsedJobs.map((job) => ({
+                ...job,
+                keyId: decryptData(job.keyId, secretKey),
+                appKey: decryptData(job.appKey, secretKey)
+            }));
 
             setJobs(decryptedJobs);
-        } catch {
+        } catch (err) {
+            console.error('Failed to load jobs:', err);
+            setOutput(_('Error loading jobs: ') + (err.message || err));
             setJobs([]);
         }
     };
 
     const saveJobs = async (newJobs: Job[]) => {
         try {
-            const encryptedJobs: Job[] = await Promise.all(
-                newJobs.map(async (job) => ({
-                    ...job,
-                    keyId: await simpleEncrypt(job.keyId),
-                    appKey: await simpleEncrypt(job.appKey)
-                }))
-            );
+            const encryptedJobs: Job[] = newJobs.map((job) => ({
+                ...job,
+                keyId: encryptData(job.keyId, secretKey),
+                appKey: encryptData(job.appKey, secretKey)
+            }));
 
             await cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(encryptedJobs, null, 2));
             setJobs(newJobs);
         } catch (err: any) {
+            console.error('Failed to save jobs:', err);
             setOutput(_('Error saving job: ') + (err.message || err));
         }
     };
 
     const handleSaveJob = async () => {
         if (!keyId || !appKey || !bucket || !folder) {
+
             setOutput(_('All fields are required.'));
             return;
         }
@@ -114,8 +120,17 @@ export const Application = () => {
         setKeyId('');
         setAppKey('');
         setBucket('');
-        setFolder('/tank_ssd/shared');
+        setFolder('');
         setEditIndex(null);
+    };
+
+    const handleCancelEdit = () => {
+        setKeyId('');
+        setAppKey('');
+        setBucket('');
+        setFolder('');
+        setEditIndex(null);
+        setOutput(_('Edit cancelled.'));
     };
 
     const handleDeleteJob = async (index: number) => {
@@ -134,8 +149,8 @@ export const Application = () => {
         document.body.style.cursor = 'wait';
 
         try {
-            const decryptedKeyId = await simpleDecrypt(job.keyId);
-            const decryptedAppKey = await simpleDecrypt(job.appKey);
+            const decryptedKeyId = decryptData(job.keyId, secretKey);
+            const decryptedAppKey = decryptData(job.appKey, secretKey);
 
             cockpit
                 .spawn(
@@ -150,15 +165,16 @@ export const Application = () => {
                 )
                 .done((data: string) => {
                     setOutput(data);
+                    setIsRunning(false);
+                    document.body.style.cursor = 'default';
                 })
                 .fail((err: any) => {
                     setOutput(_('Backup failed: ') + (err.message || err));
-                })
-                .always(() => {
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 });
         } catch (err: any) {
+            console.error('Error decrypting job:', err);
             setOutput(_('Error decrypting job: ') + (err.message || err));
             setIsRunning(false);
             document.body.style.cursor = 'default';
@@ -171,13 +187,29 @@ export const Application = () => {
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
                     <CardBody>
-                        {editIndex !== null && (
-                            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
-                                <Alert variant="info" title={_('Editing existing job')} isInline />
-                            </div>
+                        {/* Show output as an Alert if present */}
+                        {output && (
+                            <Alert
+                                variant={
+                                    output.toLowerCase().includes('error') || output.toLowerCase().includes('failed')
+                                        ? 'danger'
+                                        : output.toLowerCase().includes('saved') || output.toLowerCase().includes('deleted')
+                                            ? 'success'
+                                            : 'info'
+                                }
+                                title={output}
+                                isInline
+                                style={{ marginBottom: '16px' }}
+                            />
                         )}
 
                         <Form isHorizontal>
+                            {editIndex !== null && (
+                                <div style={{ marginBottom: '10px', marginTop: '10px' }}>
+                                    <Alert variant="info" title={_('Editing existing job')} isInline />
+                                </div>
+                            )}
+
                             <Grid hasGutter>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Application Key ID')} fieldId="keyId">
@@ -208,52 +240,28 @@ export const Application = () => {
                             </Grid>
 
                             <div style={{ marginTop: '10px' }}>
-                                {editIndex !== null ? (
-                                    <>
-                                        <Button
-                                            variant="primary"
-                                            onClick={handleSaveJob}
-                                            style={{ marginRight: '10px' }}
-                                            isDisabled={isRunning}
-                                        >
-                                            {_('Save Changes')}
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() => {
-                                                setKeyId('');
-                                                setAppKey('');
-                                                setBucket('');
-                                                setFolder('/tank_ssd/shared');
-                                                setEditIndex(null);
-                                                setOutput(_('Edit cancelled.'));
-                                            }}
-                                            isDisabled={isRunning}
-                                        >
-                                            {_('Cancel')}
-                                        </Button>
-                                    </>
-                                ) : (
+                                <Button
+                                    variant="primary"
+                                    onClick={handleSaveJob}
+                                    style={{ marginRight: '10px' }}
+                                    isDisabled={isRunning}
+                                >
+                                    {_('Save Job')}
+                                </Button>
+                                {editIndex !== null && (
                                     <Button
-                                        variant="primary"
-                                        onClick={handleSaveJob}
+                                        variant="secondary"
+                                        onClick={handleCancelEdit}
                                         isDisabled={isRunning}
                                     >
-                                        {_('Save Job')}
+                                        {_('Cancel')}
                                     </Button>
+                                )}
+                                {isRunning && (
+                                    <Spinner size="md" isSVG style={{ marginLeft: '10px', verticalAlign: 'middle' }} />
                                 )}
                             </div>
                         </Form>
-
-                        {isRunning && (
-                            <div style={{ marginTop: '10px' }}>
-                                <Spinner size="md" isSVG />
-                            </div>
-                        )}
-
-                        <FormGroup label={_('Output')} fieldId="output" style={{ marginTop: '20px' }}>
-                            <TextArea id="output" value={output} isReadOnly rows={10} />
-                        </FormGroup>
 
                         <Divider style={{ margin: '20px 0' }} />
                         <Title headingLevel="h2" size="lg">
