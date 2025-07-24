@@ -30,7 +30,7 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
-import { loadConfig, getConfig } from './config';
+import { loadConfig, getConfigValue } from './config';
 import { encryptData, decryptData } from './encrypt';
 
 const _ = cockpit.gettext;
@@ -58,9 +58,8 @@ export const Application = () => {
 
     useEffect(() => {
         const init = async () => {
-            const loadedConfig = await loadConfig();
-            setConfig(loadedConfig);
-            setSecretKey(loadedConfig.secretKey); // Only set secretKey once config is loaded
+            await loadConfig();  // guaranteed to set config.secretKey
+            await loadJobs();    // safe to read secretKey now
         };
         init();
     }, []);
@@ -82,8 +81,8 @@ export const Application = () => {
 
             const decryptedJobs: Job[] = parsedJobs.map((job) => ({
                 ...job,
-                keyId: decryptData(job.keyId, secretKey),
-                appKey: decryptData(job.appKey, secretKey)
+                keyId: decryptData(job.keyId, getConfigValue('secretKey')),
+                appKey: decryptData(job.appKey, getConfigValue('secretKey'))
             }));
 
             setJobs(decryptedJobs);
