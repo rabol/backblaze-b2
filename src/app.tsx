@@ -58,19 +58,22 @@ export const Application = () => {
 
     useEffect(() => {
         const init = async () => {
-            const loadedConfig = await loadConfig();  // now returns actual config
+            const loadedConfig = await loadConfig();
             setConfig(loadedConfig);
+            setSecretKey(loadedConfig.secretKey); // Only set secretKey once config is loaded
         };
         init();
     }, []);
 
     useEffect(() => {
         loadJobs();
-        loadConfig().then(config => {
-            setSecretKey(config.secretKey);
-        });
-    }, []);
+    }, [secretKey]); // Only reload jobs when secretKey changes
 
+    // Helper to show alert and reset visibility
+    const showOutput = (msg: string) => {
+        setOutput(msg);
+        setShowAlert(true);
+    };
 
     const loadJobs = async () => {
         try {
@@ -86,7 +89,7 @@ export const Application = () => {
             setJobs(decryptedJobs);
         } catch (err) {
             console.error('Failed to load jobs:', err);
-            setOutput(_('Error loading jobs: ') + (err.message || err));
+            showOutput(_('Error loading jobs: ') + (err.message || err));
             setJobs([]);
         }
     };
@@ -103,14 +106,13 @@ export const Application = () => {
             setJobs(newJobs);
         } catch (err: any) {
             console.error('Failed to save jobs:', err);
-            setOutput(_('Error saving job: ') + (err.message || err));
+            showOutput(_('Error saving job: ') + (err.message || err));
         }
     };
 
     const handleSaveJob = async () => {
         if (!keyId || !appKey || !bucket || !folder) {
-
-            setOutput(_('All fields are required.'));
+            showOutput(_('All fields are required.'));
             return;
         }
 
@@ -125,9 +127,8 @@ export const Application = () => {
         }
 
         await saveJobs(updatedJobs);
-        setOutput(_('Job saved.'));
+        showOutput(_('Job saved.'));
 
-        // Clear form
         setKeyId('');
         setAppKey('');
         setBucket('');
@@ -141,7 +142,7 @@ export const Application = () => {
         setBucket('');
         setFolder('');
         setEditIndex(null);
-        setOutput(_('Edit cancelled.'));
+        showOutput(_('Edit cancelled.'));
     };
 
     const handleDeleteJob = async (index: number) => {
@@ -149,13 +150,13 @@ export const Application = () => {
         const updatedJobs = [...jobs];
         updatedJobs.splice(index, 1);
         await saveJobs(updatedJobs);
-        setOutput(_('Job deleted.'));
+        showOutput(_('Job deleted.'));
     };
 
     const handleRunJob = async (job: Job) => {
         if (!window.confirm(_('Are you sure you want to run this backup job?'))) return;
 
-        setOutput(_('Running backup...'));
+        showOutput(_('Running backup...'));
         setIsRunning(true);
         document.body.style.cursor = 'wait';
 
@@ -175,18 +176,18 @@ export const Application = () => {
                     { superuser: 'require' }
                 )
                 .done((data: string) => {
-                    setOutput(data);
+                    showOutput(data);
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 })
                 .fail((err: any) => {
-                    setOutput(_('Backup failed: ') + (err.message || err));
+                    showOutput(_('Backup failed: ') + (err.message || err));
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 });
         } catch (err: any) {
             console.error('Error decrypting job:', err);
-            setOutput(_('Error decrypting job: ') + (err.message || err));
+            showOutput(_('Error decrypting job: ') + (err.message || err));
             setIsRunning(false);
             document.body.style.cursor = 'default';
         }
@@ -198,8 +199,8 @@ export const Application = () => {
                 <Card>
                     <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
                     <CardBody>
-                        {/* Show output as an Alert if present */}
-                        {output && (
+                        {/* Show output as an Alert if present and visible */}
+                        {output && showAlert && (
                             <Alert
                                 variant={
                                     output.toLowerCase().includes('error') || output.toLowerCase().includes('failed')
@@ -238,7 +239,6 @@ export const Application = () => {
                                         />
                                     </FormGroup>
                                 </GridItem>
-
                                 <GridItem span={6}>
                                     <FormGroup label={_('Bucket Name')} fieldId="bucket">
                                         <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
@@ -312,6 +312,7 @@ export const Application = () => {
                                                             setBucket(job.bucket);
                                                             setFolder(job.folder);
                                                             setEditIndex(index);
+                                                            setShowAlert(false); // Hide alert when editing
                                                         }}
                                                         style={{ marginRight: '8px' }}
                                                         isDisabled={isRunning}
