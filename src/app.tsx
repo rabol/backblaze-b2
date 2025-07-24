@@ -136,6 +136,7 @@ export const Application = () => {
     };
 
     const handleCancelEdit = () => {
+        setEditIndex(null);
         setKeyId('');
         setAppKey('');
         setBucket('');
