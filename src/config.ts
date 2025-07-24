@@ -10,7 +10,7 @@ export function getConfig(): Record<string, any> {
     return config;
 }
 
-export async function loadConfig(): Promise<void> {
+export async function loadConfig(): Promise<Record<string, any>> {
     try {
         const content = await cockpit.file(CONFIG_FILE, { superuser: true }).read();
         config = JSON.parse(content);
@@ -19,7 +19,11 @@ export async function loadConfig(): Promise<void> {
         console.warn('[config] Failed to load config. Using empty config.', error);
         config = {};
     }
+
+    return config;
 }
+
+
 
 export async function saveConfig(): Promise<void> {
     try {
@@ -32,7 +36,10 @@ export async function saveConfig(): Promise<void> {
 }
 
 export function getConfigValue(key: string, fallback: any = null): any {
-    return config.hasOwnProperty(key) ? config[key] : fallback;
+    if (config && typeof config === 'object' && Object.prototype.hasOwnProperty.call(config, key)) {
+        return config[key];
+    }
+    return fallback;
 }
 
 export function setConfigValue(key: string, value: any): void {

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Alert,
+    AlertActionCloseButton,
     Button,
     Card,
     CardBody,
@@ -53,6 +54,7 @@ export const Application = () => {
     const [isRunning, setIsRunning] = useState(false);
     const [secretKey, setSecretKey] = useState('');
     const [config, setConfig] = useState<Record<string, any> | null>(null);
+    const [showAlert, setShowAlert] = useState(true);
 
     useEffect(() => {
         const init = async () => {
@@ -210,6 +212,7 @@ export const Application = () => {
                                 title={output}
                                 isInline
                                 style={{ marginBottom: '16px' }}
+                                actionClose={<AlertActionCloseButton onClose={() => setShowAlert(false)} />}
                             />
                         )}
 
