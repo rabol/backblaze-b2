@@ -115,6 +115,8 @@ export const Application = () => {
             return;
         }
 
+        setEditIndex(null);
+
         const newJob: Job = { keyId, appKey, bucket, folder };
 
         let updatedJobs;
@@ -127,6 +129,7 @@ export const Application = () => {
 
         await saveJobs(updatedJobs);
         showOutput(_('Job saved.'));
+
 
         setKeyId('');
         setAppKey('');
