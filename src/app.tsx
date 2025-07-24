@@ -58,8 +58,7 @@ export const Application = () => {
 
     useEffect(() => {
         const init = async () => {
-            await loadConfig();
-            const loadedConfig = getConfig();
+            const loadedConfig = await loadConfig();  // now returns actual config
             setConfig(loadedConfig);
         };
         init();

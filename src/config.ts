@@ -24,7 +24,6 @@ export async function loadConfig(): Promise<Record<string, any>> {
 }
 
 
-
 export async function saveConfig(): Promise<void> {
     try {
         await cockpit.file(CONFIG_FILE, { superuser: true }).replace(JSON.stringify(config, null, 2));
