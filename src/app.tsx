@@ -29,16 +29,11 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
+import { loadConfig, saveConfig } from './config';
 import { encryptData, decryptData } from './encrypt';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
-
-// Load key from environment or fallback
-const secretKey = process.env.B2_SECRET_KEY || 'a7f3b9c2d8e6h1k4'; // fallback only used in dev
-if (!process.env.SECRET_KEY) {
-    console.warn('WARNING: Using fallback secret key. Set SECRET_KEY in environment for better security.');
-}
 
 type Job = {
     keyId: string;
@@ -56,10 +51,15 @@ export const Application = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [editIndex, setEditIndex] = useState<number | null>(null);
     const [isRunning, setIsRunning] = useState(false);
+    const [secretKey, setSecretKey] = useState('');
 
     useEffect(() => {
         loadJobs();
+        loadConfig().then(config => {
+            setSecretKey(config.secretKey);
+        });
     }, []);
+
 
     const loadJobs = async () => {
         try {
