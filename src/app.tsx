@@ -29,7 +29,7 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
-import { loadConfig, saveConfig } from './config';
+import { loadConfig, getConfig } from './config';
 import { encryptData, decryptData } from './encrypt';
 
 const _ = cockpit.gettext;
@@ -52,6 +52,16 @@ export const Application = () => {
     const [editIndex, setEditIndex] = useState<number | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [secretKey, setSecretKey] = useState('');
+    const [config, setConfig] = useState<Record<string, any> | null>(null);
+
+    useEffect(() => {
+        const init = async () => {
+            await loadConfig();
+            const loadedConfig = getConfig();
+            setConfig(loadedConfig);
+        };
+        init();
+    }, []);
 
     useEffect(() => {
         loadJobs();

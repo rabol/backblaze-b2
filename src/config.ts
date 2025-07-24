@@ -6,6 +6,10 @@ let config: Record<string, any> = {
     secretKey: 'changeme12345678'  // fallback
 };
 
+export function getConfig(): Record<string, any> {
+    return config;
+}
+
 export async function loadConfig(): Promise<void> {
     try {
         const content = await cockpit.file(CONFIG_FILE, { superuser: true }).read();
