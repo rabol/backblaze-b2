@@ -1,4 +1,5 @@
 // src/app.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
     Alert,
@@ -12,10 +13,10 @@ import {
     FormGroup,
     Grid,
     GridItem,
+    Modal,
     Page,
     PageSection,
     Spinner,
-    TextArea,
     TextInput,
     Title
 } from '@patternfly/react-core';
@@ -30,13 +31,15 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
-import { loadConfig, getConfigValue } from './config';
+import { loadConfig, getConfigValue, saveConfig } from './config';
 import { encryptData, decryptData } from './encrypt';
+import { summarizeBackupOutput } from './utils';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
 
 type Job = {
+    jobName: string;
     keyId: string;
     appKey: string;
     bucket: string;
@@ -44,6 +47,7 @@ type Job = {
 };
 
 export const Application = () => {
+    const [jobName, setJobName] = useState('');
     const [keyId, setKeyId] = useState('');
     const [appKey, setAppKey] = useState('');
     const [bucket, setBucket] = useState('');
@@ -52,42 +56,39 @@ export const Application = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [editIndex, setEditIndex] = useState<number | null>(null);
     const [isRunning, setIsRunning] = useState(false);
-    const [secretKey, setSecretKey] = useState('');
-    const [config, setConfig] = useState<Record<string, any> | null>(null);
     const [showAlert, setShowAlert] = useState(true);
 
+
+    // Config modal
+    const [showConfig, setShowConfig] = useState(false);
+    const [newSecret, setNewSecret] = useState('');
+
+    // Load config, then secretKey, then jobs
     useEffect(() => {
         const init = async () => {
-            await loadConfig();  // guaranteed to set config.secretKey
-            await loadJobs();    // safe to read secretKey now
+            await loadConfig();
+            const key = getConfigValue('secretKey', 'changeme12345678');
+
+            loadJobs();
         };
         init();
     }, []);
 
-    useEffect(() => {
-        loadJobs();
-    }, [secretKey]); // Only reload jobs when secretKey changes
 
-    // Helper to show alert and reset visibility
-    const showOutput = (msg: string) => {
-        setOutput(msg);
-        setShowAlert(true);
-    };
-
+    // Always pass secretKey as param for clarity
     const loadJobs = async () => {
         try {
-            const content = await cockpit.file(JOBS_FILE, { superuser: true }).read();
+            const content = await cockpit.file(JOBS_FILE, { superuser: 'require' }).read();
             const parsedJobs: Job[] = JSON.parse(content);
 
+            // Decrypt using current secretKey
             const decryptedJobs: Job[] = parsedJobs.map((job) => ({
                 ...job,
-                keyId: decryptData(job.keyId, getConfigValue('secretKey')),
-                appKey: decryptData(job.appKey, getConfigValue('secretKey'))
+                keyId: decryptData(job.keyId, getConfigValue('secretKey', 'changeme12345678')),
+                appKey: decryptData(job.appKey, getConfigValue('secretKey', 'changeme12345678'))
             }));
-
             setJobs(decryptedJobs);
-        } catch (err) {
-            console.error('Failed to load jobs:', err);
+        } catch (err: any) {
             showOutput(_('Error loading jobs: ') + (err.message || err));
             setJobs([]);
         }
@@ -95,61 +96,63 @@ export const Application = () => {
 
     const saveJobs = async (newJobs: Job[]) => {
         try {
+
+            // Encrypt using current secretKey
             const encryptedJobs: Job[] = newJobs.map((job) => ({
                 ...job,
-                keyId: encryptData(job.keyId, secretKey),
-                appKey: encryptData(job.appKey, secretKey)
+                keyId: encryptData(job.keyId, getConfigValue('secretKey', 'changeme12345678')),
+                appKey: encryptData(job.appKey, getConfigValue('secretKey', 'changeme12345678'))
             }));
 
-            await cockpit.file(JOBS_FILE, { superuser: true }).replace(JSON.stringify(encryptedJobs, null, 2));
+            await cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(JSON.stringify(encryptedJobs, null, 2));
             setJobs(newJobs);
         } catch (err: any) {
-            console.error('Failed to save jobs:', err);
             showOutput(_('Error saving job: ') + (err.message || err));
         }
     };
 
     const handleSaveJob = async () => {
-        if (!keyId || !appKey || !bucket || !folder) {
+        if (!jobName || !keyId || !appKey || !bucket || !folder) {
             showOutput(_('All fields are required.'));
             return;
         }
 
-        setEditIndex(null);
-
-        const newJob: Job = { keyId, appKey, bucket, folder };
-
         let updatedJobs;
         if (editIndex !== null) {
             updatedJobs = [...jobs];
-            updatedJobs[editIndex] = newJob;
+            updatedJobs[editIndex] = { jobName, keyId, appKey, bucket, folder };
         } else {
-            updatedJobs = [...jobs, newJob];
+            updatedJobs = [...jobs, { jobName, keyId, appKey, bucket, folder }];
         }
 
         await saveJobs(updatedJobs);
+
         showOutput(_('Job saved.'));
-
-
+        setJobName('');
         setKeyId('');
         setAppKey('');
         setBucket('');
         setFolder('');
         setEditIndex(null);
+    };
+
+    const showOutput = (msg: string) => {
+        setOutput(msg);
+        setShowAlert(true);
     };
 
     const handleCancelEdit = () => {
         setEditIndex(null);
+        setJobName('');
         setKeyId('');
         setAppKey('');
         setBucket('');
         setFolder('');
-        setEditIndex(null);
-        showOutput(_('Edit cancelled.'));
     };
 
     const handleDeleteJob = async (index: number) => {
         if (!window.confirm(_('Are you sure you want to delete this job?'))) return;
+
         const updatedJobs = [...jobs];
         updatedJobs.splice(index, 1);
         await saveJobs(updatedJobs);
@@ -159,13 +162,17 @@ export const Application = () => {
     const handleRunJob = async (job: Job) => {
         if (!window.confirm(_('Are you sure you want to run this backup job?'))) return;
 
-        showOutput(_('Running backup...'));
+
         setIsRunning(true);
         document.body.style.cursor = 'wait';
 
         try {
-            const decryptedKeyId = decryptData(job.keyId, secretKey);
-            const decryptedAppKey = decryptData(job.appKey, secretKey);
+
+            // The job in jobs[] is already DECRYPTED!
+            const decryptedKeyId = job.keyId;
+            const decryptedAppKey = job.appKey;
+
+            showOutput(_('Running backup : ') + job.jobName);
 
             cockpit
                 .spawn(
@@ -179,7 +186,7 @@ export const Application = () => {
                     { superuser: 'require' }
                 )
                 .done((data: string) => {
-                    showOutput(data);
+                    showOutput(summarizeBackupOutput(data).summary);
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 })
@@ -188,9 +195,12 @@ export const Application = () => {
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
                 });
+
+            setIsRunning(false);
+            document.body.style.cursor = 'default';
         } catch (err: any) {
-            console.error('Error decrypting job:', err);
-            showOutput(_('Error decrypting job: ') + (err.message || err));
+
+            showOutput(_('Error running job: ') + (err.message || err));
             setIsRunning(false);
             document.body.style.cursor = 'default';
         }
@@ -198,10 +208,22 @@ export const Application = () => {
 
     return (
         <Page className="no-masthead-sidebar" isContentFilled>
-            <PageSection variant="light">
+            <PageSection>
                 <Card>
-                    <CardTitle>{_('Backblaze B2 Backup')}</CardTitle>
+                    <CardTitle>
+                        <span>{_('Backblaze B2 Backup')}</span>
+                        <Button
+                            variant="secondary"
+                            style={{ float: 'right', marginLeft: 8 }}
+                            onClick={() => {
+                                setNewSecret(getConfigValue('secretKey', 'changeme12345678'));   // Set input to current secret
+                                setShowConfig(true);
+                            }}
+                            isDisabled={isRunning || editIndex !== null}
+                        >{_('Config')}</Button>
+                    </CardTitle>
                     <CardBody>
+
                         {/* Show output as an Alert if present and visible */}
                         {output && showAlert && (
                             <Alert
@@ -215,18 +237,19 @@ export const Application = () => {
                                 title={output}
                                 isInline
                                 style={{ marginBottom: '16px' }}
+                                timeout={5000}
+                                onTimeout={() => setShowAlert(false)}
                                 actionClose={<AlertActionCloseButton onClose={() => setShowAlert(false)} />}
                             />
                         )}
 
                         <Form isHorizontal>
-                            {editIndex !== null && (
-                                <div style={{ marginBottom: '10px', marginTop: '10px' }}>
-                                    <Alert variant="info" title={_('Editing existing job')} isInline />
-                                </div>
-                            )}
-
                             <Grid hasGutter>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Job Name')} fieldId="jobName">
+                                        <TextInput id="jobName" value={jobName} onChange={(_, v) => setJobName(v)} />
+                                    </FormGroup>
+                                </GridItem>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Application Key ID')} fieldId="keyId">
                                         <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
@@ -248,7 +271,7 @@ export const Application = () => {
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
-                                    <FormGroup label={_('Local Folder to Backup')} fieldId="folder">
+                                    <FormGroup label={_('Folder to Backup')} fieldId="folder">
                                         <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
                                     </FormGroup>
                                 </GridItem>
@@ -273,7 +296,7 @@ export const Application = () => {
                                     </Button>
                                 )}
                                 {isRunning && (
-                                    <Spinner size="md" isSVG style={{ marginLeft: '10px', verticalAlign: 'middle' }} />
+                                    <Spinner size="md" style={{ marginLeft: '10px', verticalAlign: 'middle' }} />
                                 )}
                             </div>
                         </Form>
@@ -288,6 +311,7 @@ export const Application = () => {
                                 <Table variant="compact" className="pf-m-sticky-header" style={{ width: '100%' }}>
                                     <Thead>
                                         <Tr>
+                                            <Th>{_('Name')}</Th>
                                             <Th>{_('Bucket')}</Th>
                                             <Th>{_('Folder')}</Th>
                                             <Th style={{ textAlign: 'right' }}>{_('Actions')}</Th>
@@ -296,6 +320,7 @@ export const Application = () => {
                                     <Tbody>
                                         {jobs.map((job, index) => (
                                             <Tr key={index}>
+                                                <Td>{job.jobName}</Td>
                                                 <Td>{job.bucket}</Td>
                                                 <Td>{job.folder}</Td>
                                                 <Td style={{ textAlign: 'right' }}>
@@ -303,29 +328,30 @@ export const Application = () => {
                                                         variant="primary"
                                                         onClick={() => handleRunJob(job)}
                                                         style={{ marginRight: '8px' }}
-                                                        isDisabled={isRunning}
+                                                        isDisabled={isRunning || editIndex !== null}
                                                     >
                                                         {_('Run')}
                                                     </Button>
                                                     <Button
                                                         variant="secondary"
                                                         onClick={() => {
+                                                            setJobName(job.jobName);
                                                             setKeyId(job.keyId);
                                                             setAppKey(job.appKey);
                                                             setBucket(job.bucket);
                                                             setFolder(job.folder);
                                                             setEditIndex(index);
-                                                            setShowAlert(false); // Hide alert when editing
+                                                            setShowAlert(false);
                                                         }}
                                                         style={{ marginRight: '8px' }}
-                                                        isDisabled={isRunning}
+                                                        isDisabled={isRunning || editIndex !== null}
                                                     >
                                                         {_('Edit')}
                                                     </Button>
                                                     <Button
                                                         variant="danger"
                                                         onClick={() => handleDeleteJob(index)}
-                                                        isDisabled={isRunning}
+                                                        isDisabled={isRunning || editIndex !== null}
                                                     >
                                                         {_('Delete')}
                                                     </Button>
@@ -338,6 +364,52 @@ export const Application = () => {
                         </Grid>
                     </CardBody>
                 </Card>
+
+                {showConfig && (
+                    <div
+                        style={{
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            background: 'rgba(0,0,0,0.4)', zIndex: 1000,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                    >
+                        <div style={{
+                            background: '#fff', padding: 32, borderRadius: 8, minWidth: 320, boxShadow: '0 2px 18px #0003'
+                        }}>
+                            <h3>Config</h3>
+                            <label style={{ display: 'block', marginBottom: 8 }}>Secret Key</label>
+                            <input
+                                type="text"
+                                value={newSecret}
+                                onChange={e => setNewSecret(e.target.value)}
+                                style={{ width: '100%', marginBottom: 16, padding: 6 }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <Button
+                                    variant="danger"
+                                    onClick={() => setShowConfig(false)}
+                                >
+                                    Cancel
+                                </Button>
+
+
+                                <Button
+                                    variant="primary"
+                                    style={{ marginLeft: 'auto' }}
+                                    onClick={async () => {
+                                        await saveConfig({ secretKey: newSecret });
+                                        setShowConfig(false);
+
+                                        showOutput('Secret updated.');
+                                        loadJobs();      // reload jobs using new secret
+                                    }}
+                                >
+                                    {_('Save')}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </PageSection>
         </Page>
     );

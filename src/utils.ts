@@ -47,3 +47,7 @@ export function summarizeBackupOutput(rawOutput: string): { summary: string, det
 
     return { summary, details };
 }
+
+export function debug(...args: unknown[]): void {
+    console.log('[DEBUG]', ...args);
+}
