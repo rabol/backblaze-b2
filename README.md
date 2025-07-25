@@ -4,6 +4,101 @@ This is a simple Backblaze B2 backup module for [Cockpit](https://cockpit-projec
 
 It uses [Cockpit Starter Kit](https://github.com/cockpit-project/starter-kit) as a base
 
+
+### Features
+	Create, edit, and delete B2 backup jobs via the Cockpit web UI
+	Save job definitions in /etc/cockpit-backblaze-b2/jobs.json
+	Run jobs manually or on a schedule using cron
+	No encryption: app key and ID are stored in plaintext in jobs.json.
+(Server security is assumed. Restrict file permissions accordingly.)
+
+### Jobs
+
+Jobs created with this app is stored in ```/etc/cockpit-backblaze-b2/jobs.json``` and the format is:
+
+(values below is completely random)
+```json
+[
+  {
+    "jobName": "nightly-home",
+    "keyId": "0038d8ace473683wq268643",
+    "appKey": "K003KldOw14BUxPCZpqfdsaffdfasfdsffsff",
+    "bucket": "my-super-nas",
+    "folder": "/tank_hdd/shared"
+  }
+]
+```
+
+#### Permissions
+```bash
+sudo mkdir /etc/cockpit-backblaze-b2
+sudo touch /etc/cockpit-backblaze-b2/jobs.json
+sudo chmod 600 /etc/cockpit-backblaze-b2/jobs.json
+sudo chown root:root /etc/cockpit-backblaze-b2/jobs.json
+```
+
+### Scheduling backups
+To schedule automatic backups, add a cron entry that runs every minute:
+
+```cron
+* * * * * /usr/libexec/cockpit-backblaze-b2/runner.js
+```
+The runner.js script should read jobs.json and execute each job as needed.
+
+You may want to run specific jobs at certain times—use your preferred cron logic.
+
+Example for running all jobs at 3:00 AM:
+```cron
+0 3 * * * /usr/libexec/cockpit-backblaze-b2/runner.js
+```
+
+### Example runner.js
+Require node.js
+
+To install node.js run this:
+```bash
+sudo apt install nodejs npm
+```
+
+runner.js
+
+```js
+#!/usr/bin/env node
+
+const fs = require('fs');
+const { spawnSync } = require('child_process');
+
+const JOBS_FILE = '/etc/cockpit-backblaze-b2/jobs.json';
+
+if (!fs.existsSync(JOBS_FILE)) {
+  console.error(`Jobs file not found: ${JOBS_FILE}`);
+  process.exit(1);
+}
+
+const jobs = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf-8'));
+
+for (const job of jobs) {
+  const { keyId, appKey, bucket, folder, jobName } = job;
+  console.log(`Running backup job: ${jobName}`);
+  const result = spawnSync(
+    '/usr/libexec/cockpit-backblaze-b2/sync.sh',
+    [keyId, appKey, bucket, folder],
+    { stdio: 'inherit' }
+  );
+  if (result.error) {
+    console.error(`Job "${jobName}" failed:`, result.error);
+  } else {
+    console.log(`Job "${jobName}" completed.`);
+  }
+}
+```
+
+## Security
+AppKey and KeyId are stored unencrypted. Restrict file permissions!
+
+Only allow trusted users to access /etc/cockpit-backblaze-b2.
+
+
 ## Downloading the Module
 
 Clone this repository to your system:
@@ -12,6 +107,8 @@ Clone this repository to your system:
 git clone https://github.com/rabol/backblaze-b2.git
 cd backblaze-b2
 ```
+
+
 
 ## Development Dependencies
 
@@ -87,9 +184,9 @@ rm ~/.local/share/cockpit/backblaze-b2
 Copy the `sync.sh` script to a system location:
 
 ```sh
-sudo mkdir -p /usr/libexec/backblaze-b2
-sudo cp sync.sh /usr/libexec/backblaze-b2/sync.sh
-sudo chmod +x /usr/libexec/backblaze-b2/sync.sh
+sudo mkdir -p /usr/libexec/cockpit-backblaze-b2
+sudo cp sync.sh /usr/libexec/cockpit-backblaze-b2/sync.sh
+sudo chmod +x /usr/libexec/cockpit-backblaze-b2/sync.sh
 ```
 
 Ensure it’s executable and accessible by the Cockpit backend.

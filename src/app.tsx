@@ -32,11 +32,10 @@ import {
 
 import cockpit from 'cockpit';
 import { loadConfig, getConfigValue, saveConfig } from './config';
-import { encryptData, decryptData } from './encrypt';
 import { summarizeBackupOutput } from './utils';
 
 const _ = cockpit.gettext;
-const JOBS_FILE = '/etc/backblaze-b2/jobs.json';
+const JOBS_FILE = '/etc/cockpit-backblaze-b2/jobs.json';
 
 type Job = {
     jobName: string;
@@ -44,6 +43,7 @@ type Job = {
     appKey: string;
     bucket: string;
     folder: string;
+    schedule: string;
 };
 
 export const Application = () => {
@@ -52,6 +52,7 @@ export const Application = () => {
     const [appKey, setAppKey] = useState('');
     const [bucket, setBucket] = useState('');
     const [folder, setFolder] = useState('');
+    const [schedule, setSchedule] = useState('');
     const [output, setOutput] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
     const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -75,19 +76,17 @@ export const Application = () => {
     }, []);
 
 
-    // Always pass secretKey as param for clarity
     const loadJobs = async () => {
+        setJobs([]); // Reset jobs before loading
         try {
             const content = await cockpit.file(JOBS_FILE, { superuser: 'require' }).read();
-            const parsedJobs: Job[] = JSON.parse(content);
 
-            // Decrypt using current secretKey
-            const decryptedJobs: Job[] = parsedJobs.map((job) => ({
-                ...job,
-                keyId: decryptData(job.keyId, getConfigValue('secretKey', 'changeme12345678')),
-                appKey: decryptData(job.appKey, getConfigValue('secretKey', 'changeme12345678'))
-            }));
-            setJobs(decryptedJobs);
+            // If the file is empty or just whitespace, treat as no jobs
+            const safeContent = content && content.trim().length > 0 ? content : '[]';
+
+            const parsedJobs: Job[] = JSON.parse(safeContent);
+
+            setJobs(parsedJobs);
         } catch (err: any) {
             showOutput(_('Error loading jobs: ') + (err.message || err));
             setJobs([]);
@@ -96,15 +95,7 @@ export const Application = () => {
 
     const saveJobs = async (newJobs: Job[]) => {
         try {
-
-            // Encrypt using current secretKey
-            const encryptedJobs: Job[] = newJobs.map((job) => ({
-                ...job,
-                keyId: encryptData(job.keyId, getConfigValue('secretKey', 'changeme12345678')),
-                appKey: encryptData(job.appKey, getConfigValue('secretKey', 'changeme12345678'))
-            }));
-
-            await cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(JSON.stringify(encryptedJobs, null, 2));
+            await cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(JSON.stringify(newJobs, null, 2));
             setJobs(newJobs);
         } catch (err: any) {
             showOutput(_('Error saving job: ') + (err.message || err));
@@ -120,9 +111,9 @@ export const Application = () => {
         let updatedJobs;
         if (editIndex !== null) {
             updatedJobs = [...jobs];
-            updatedJobs[editIndex] = { jobName, keyId, appKey, bucket, folder };
+            updatedJobs[editIndex] = { jobName, keyId, appKey, bucket, folder, schedule };
         } else {
-            updatedJobs = [...jobs, { jobName, keyId, appKey, bucket, folder }];
+            updatedJobs = [...jobs, { jobName, keyId, appKey, bucket, folder, schedule }];
         }
 
         await saveJobs(updatedJobs);
@@ -133,6 +124,7 @@ export const Application = () => {
         setAppKey('');
         setBucket('');
         setFolder('');
+        setSchedule('');
         setEditIndex(null);
     };
 
@@ -148,10 +140,13 @@ export const Application = () => {
         setAppKey('');
         setBucket('');
         setFolder('');
+        setSchedule('');
     };
 
     const handleDeleteJob = async (index: number) => {
-        if (!window.confirm(_('Are you sure you want to delete this job?'))) return;
+
+        if (!window.confirm(_('Are you sure you want to delete this job?')))
+            return;
 
         const updatedJobs = [...jobs];
         updatedJobs.splice(index, 1);
@@ -160,7 +155,9 @@ export const Application = () => {
     };
 
     const handleRunJob = async (job: Job) => {
-        if (!window.confirm(_('Are you sure you want to run this backup job?'))) return;
+
+        if (!window.confirm(_('Are you sure you want to run this backup job?')))
+            return;
 
 
         setIsRunning(true);
@@ -168,18 +165,14 @@ export const Application = () => {
 
         try {
 
-            // The job in jobs[] is already DECRYPTED!
-            const decryptedKeyId = job.keyId;
-            const decryptedAppKey = job.appKey;
-
             showOutput(_('Running backup : ') + job.jobName);
 
             cockpit
                 .spawn(
                     [
-                        '/usr/libexec/backblaze-b2/sync.sh',
-                        decryptedKeyId,
-                        decryptedAppKey,
+                        '/usr/libexec/cockpit-backblaze-b2/sync.sh',
+                        job.keyId,
+                        job.appKey,
                         job.bucket,
                         job.folder
                     ],
@@ -212,15 +205,7 @@ export const Application = () => {
                 <Card>
                     <CardTitle>
                         <span>{_('Backblaze B2 Backup')}</span>
-                        <Button
-                            variant="secondary"
-                            style={{ float: 'right', marginLeft: 8 }}
-                            onClick={() => {
-                                setNewSecret(getConfigValue('secretKey', 'changeme12345678'));   // Set input to current secret
-                                setShowConfig(true);
-                            }}
-                            isDisabled={isRunning || editIndex !== null}
-                        >{_('Config')}</Button>
+
                     </CardTitle>
                     <CardBody>
 
@@ -247,32 +232,60 @@ export const Application = () => {
                             <Grid hasGutter>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Job Name')} fieldId="jobName">
-                                        <TextInput id="jobName" value={jobName} onChange={(_, v) => setJobName(v)} />
+                                        <TextInput
+                                            id="jobName" value={jobName}
+                                            placeholder={_('Enter a name for this backup job')}
+                                            onChange={(_, v) => setJobName(v)} />
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Application Key ID')} fieldId="keyId">
-                                        <TextInput id="keyId" value={keyId} onChange={(_, v) => setKeyId(v)} />
+                                        <TextInput
+                                            id="keyId"
+                                            value={keyId}
+                                            placeholder={_('Enter your Backblaze B2 Application Key ID')}
+                                            onChange={(_, v) => setKeyId(v)} />
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Application Key')} fieldId="appKey">
                                         <TextInput
                                             id="appKey"
-                                            type="password"
                                             value={appKey}
+                                            placeholder={_('Enter your Backblaze B2 Application Key')}
                                             onChange={(_, v) => setAppKey(v)}
                                         />
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Bucket Name')} fieldId="bucket">
-                                        <TextInput id="bucket" value={bucket} onChange={(_, v) => setBucket(v)} />
+                                        <TextInput
+                                            id="bucket"
+                                            value={bucket}
+                                            placeholder={_('Enter your Backblaze B2 Bucket Name')}
+                                            onChange={(_, v) => setBucket(v)} />
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
                                     <FormGroup label={_('Folder to Backup')} fieldId="folder">
-                                        <TextInput id="folder" value={folder} onChange={(_, v) => setFolder(v)} />
+                                        <TextInput
+                                            id="folder"
+                                            value={folder}
+                                            placeholder={_('Enter the folder to backup (leave empty for root)')}
+                                            onChange={(_, v) => setFolder(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Schedule')} fieldId="schedule">
+                                        <TextInput
+                                            id="schedule"
+                                            value={schedule}
+                                            onChange={(_, v) => setSchedule(v)}
+                                            placeholder="e.g. 0 3 * * * (cron format)"
+                                        />
+                                        <div style={{ fontSize: 12, color: '#666' }}>
+                                            {_('Leave empty to disable scheduling.')}
+                                        </div>
                                     </FormGroup>
                                 </GridItem>
                             </Grid>
@@ -314,15 +327,25 @@ export const Application = () => {
                                             <Th>{_('Name')}</Th>
                                             <Th>{_('Bucket')}</Th>
                                             <Th>{_('Folder')}</Th>
+                                            <Th>{_('Schedule')}</Th>
                                             <Th style={{ textAlign: 'right' }}>{_('Actions')}</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {jobs.map((job, index) => (
+                                        {Array.isArray(jobs) && jobs.length === 0 && (
+                                            <Tr>
+                                                <Td colSpan={5} style={{ textAlign: 'center', color: '#888' }}>
+                                                    No jobs defined yet.
+                                                </Td>
+                                            </Tr>
+                                        )}
+
+                                        {Array.isArray(jobs) && jobs.length > 0 && jobs.map((job, index) => (
                                             <Tr key={index}>
                                                 <Td>{job.jobName}</Td>
                                                 <Td>{job.bucket}</Td>
                                                 <Td>{job.folder}</Td>
+                                                <Td>{job.schedule || ''}</Td>
                                                 <Td style={{ textAlign: 'right' }}>
                                                     <Button
                                                         variant="primary"
@@ -340,6 +363,7 @@ export const Application = () => {
                                                             setAppKey(job.appKey);
                                                             setBucket(job.bucket);
                                                             setFolder(job.folder);
+                                                            setSchedule(job.schedule || '');
                                                             setEditIndex(index);
                                                             setShowAlert(false);
                                                         }}
