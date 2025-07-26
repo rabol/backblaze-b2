@@ -190,6 +190,7 @@ sudo chmod +x /usr/libexec/cockpit-backblaze-b2/sync.sh
 ```
 
 Ensure it’s executable and accessible by the Cockpit backend.
+NOTE: the app only pick up lines that starts with "ERROR:" or "SUCCESS:"
 
 ## Example sync.sh
 
@@ -203,18 +204,18 @@ APP_KEY=$2
 BUCKET=$3
 FOLDER=$4
 
-# Authorize account using updated syntax
-if ! b2 account authorize "$KEY_ID" "$APP_KEY"; then
+# Authorize account using updated syntax, suppress output
+if ! b2 account authorize "$KEY_ID" "$APP_KEY" >/dev/null 2>&1; then
     echo "ERROR: Failed to authorize with Backblaze B2. Check your Key ID and App Key."
     exit 1
 fi
 
-# Sync folder using correct --skip-newer flag
-if ! b2 sync --delete --skip-newer "$FOLDER" "b2://$BUCKET/$(hostname)"; then
+# Sync folder using correct --skip-newer flag, suppress output
+if ! b2 sync --delete --skip-newer "$FOLDER" "b2://$BUCKET/$(hostname)" >/dev/null 2>&1; then
     echo "ERROR: Sync failed. Check folder path, bucket name, and B2 credentials."
     exit 1
 fi
 
-echo "Backup completed successfully."
+echo "SUCCESS: Backup completed successfully."
 
 ```

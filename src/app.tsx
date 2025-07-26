@@ -32,7 +32,9 @@ import {
 
 import cockpit from 'cockpit';
 import { loadConfig, getConfigValue, saveConfig } from './config';
-import { summarizeBackupOutput } from './utils';
+
+import { loadBackupHistory, logBackup, summarizeBackupOutput, type BackupLogEntry } from './log';
+import { debug } from './utils';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/cockpit-backblaze-b2/jobs.json';
@@ -46,7 +48,9 @@ type Job = {
     schedule: string;
 };
 
+
 export const Application = () => {
+
     const [jobName, setJobName] = useState('');
     const [keyId, setKeyId] = useState('');
     const [appKey, setAppKey] = useState('');
@@ -58,23 +62,23 @@ export const Application = () => {
     const [editIndex, setEditIndex] = useState<number | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [showAlert, setShowAlert] = useState(true);
-
-
-    // Config modal
     const [showConfig, setShowConfig] = useState(false);
     const [newSecret, setNewSecret] = useState('');
+    const [backupHistory, setBackupHistory] = useState<BackupLogEntry[]>([]);
 
     // Load config, then secretKey, then jobs
     useEffect(() => {
         const init = async () => {
-            await loadConfig();
-            const key = getConfigValue('secretKey', 'changeme12345678');
+            //await loadConfig();
+            //const key = getConfigValue('secretKey', 'changeme12345678');
 
             loadJobs();
+            // To display backup history:
+            const history = await loadBackupHistory();
+            setBackupHistory(history);
         };
         init();
     }, []);
-
 
     const loadJobs = async () => {
 
@@ -170,6 +174,7 @@ export const Application = () => {
 
             showOutput(_('Running backup : ') + job.jobName);
 
+            debug('[app] Running backup job:', job);
             cockpit
                 .spawn(
                     [
@@ -181,16 +186,26 @@ export const Application = () => {
                     ],
                     { superuser: 'require' }
                 )
-                .done((data: string) => {
+                .done(async (data: string) => {
 
-                    showOutput(summarizeBackupOutput(data).summary);
+                    debug('[app] Backup output:', data);
+
+                    const resultSummary = summarizeBackupOutput(data).summary;
+
+                    showOutput(resultSummary);
+                    await logBackup(job.jobName, 'success', resultSummary);
+                    const history = await loadBackupHistory();
+                    setBackupHistory(history);
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
 
                 })
-                .fail((err: any) => {
-
+                .fail(async (err: any) => {
+                    debug('[app] Backup failed:', err);
                     showOutput(_('Backup failed: ') + (err.message || err));
+                    logBackup(job.jobName, 'fail', err.message || err);
+                    const history = await loadBackupHistory();
+                    setBackupHistory(history);
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
 
@@ -200,11 +215,13 @@ export const Application = () => {
             document.body.style.cursor = 'default';
         } catch (err: any) {
 
+            debug('[app] Error running job:', err);
             showOutput(_('Error running job: ') + (err.message || err));
             setIsRunning(false);
             document.body.style.cursor = 'default';
 
         }
+        debug('[app] Finished running job:', job.jobName);
     };
 
     return (
@@ -395,6 +412,31 @@ export const Application = () => {
                                 </Table>
                             </GridItem>
                         </Grid>
+
+                        <Divider style={{ margin: '20px 0' }} />
+                        <Title headingLevel="h2" size="lg">
+                            Backup History
+                        </Title>
+                        <Table variant="compact" style={{ width: '100%' }}>
+                            <Thead>
+                                <Tr>
+                                    <Th>Job</Th>
+                                    <Th>Status</Th>
+                                    <Th>Timestamp</Th>
+                                    <Th>Details</Th>
+                                </Tr>
+                            </Thead>
+                            <Tbody>
+                                {backupHistory.map((entry, i) => (
+                                    <Tr key={i}>
+                                        <Td>{entry.jobName}</Td>
+                                        <Td>{entry.status}</Td>
+                                        <Td>{entry.timestamp}</Td>
+                                        <Td>{entry.summary}</Td>
+                                    </Tr>
+                                ))}
+                            </Tbody>
+                        </Table>
                     </CardBody>
                 </Card>
 

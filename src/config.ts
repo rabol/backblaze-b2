@@ -2,7 +2,7 @@
 
 import cockpit from 'cockpit';
 
-const CONFIG_FILE = '/etc/backblaze-b2/config.json';
+const CONFIG_FILE = '/etc/cockpit-backblaze-b2/config.json';
 
 // Module-level config object
 let config: Record<string, any> = {
