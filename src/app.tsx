@@ -31,6 +31,8 @@ import {
 } from '@patternfly/react-table';
 
 import cockpit from 'cockpit';
+
+// this will be used in the near future for configuring the b2 command
 import { loadConfig, getConfigValue, saveConfig } from './config';
 
 import { loadBackupHistory, logBackup, summarizeBackupOutput, type BackupLogEntry } from './log';
@@ -38,6 +40,7 @@ import { debug } from './utils';
 
 const _ = cockpit.gettext;
 const JOBS_FILE = '/etc/cockpit-backblaze-b2/jobs.json';
+const SYNC_SCRIPT = '/usr/libexec/cockpit-backblaze-b2/sync.sh';
 
 type Job = {
     jobName: string;
@@ -69,11 +72,7 @@ export const Application = () => {
     // Load config, then secretKey, then jobs
     useEffect(() => {
         const init = async () => {
-            //await loadConfig();
-            //const key = getConfigValue('secretKey', 'changeme12345678');
-
             loadJobs();
-            // To display backup history:
             const history = await loadBackupHistory();
             setBackupHistory(history);
         };
@@ -84,6 +83,7 @@ export const Application = () => {
 
         setJobs([]); // Reset jobs before loading
         try {
+
             const content = await cockpit.file(JOBS_FILE, { superuser: 'require' }).read();
 
             // If the file is empty or just whitespace, treat as no jobs
@@ -92,19 +92,26 @@ export const Application = () => {
             const parsedJobs: Job[] = JSON.parse(safeContent);
 
             setJobs(parsedJobs);
+
         } catch (err: any) {
+
             showOutput(_('Error loading jobs: ') + (err.message || err));
             setJobs([]);
+
         }
     };
 
     const saveJobs = async (newJobs: Job[]) => {
 
         try {
+
             await cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(JSON.stringify(newJobs, null, 2));
             setJobs(newJobs);
+
         } catch (err: any) {
+
             showOutput(_('Error saving job: ') + (err.message || err));
+
         }
     };
 
@@ -116,6 +123,7 @@ export const Application = () => {
         }
 
         let updatedJobs;
+
         if (editIndex !== null) {
             updatedJobs = [...jobs];
             updatedJobs[editIndex] = { jobName, keyId, appKey, bucket, folder, schedule };
@@ -178,7 +186,7 @@ export const Application = () => {
             cockpit
                 .spawn(
                     [
-                        '/usr/libexec/cockpit-backblaze-b2/sync.sh',
+                        SYNC_SCRIPT,
                         job.keyId,
                         job.appKey,
                         job.bucket,
@@ -201,6 +209,7 @@ export const Application = () => {
 
                 })
                 .fail(async (err: any) => {
+
                     debug('[app] Backup failed:', err);
                     showOutput(_('Backup failed: ') + (err.message || err));
                     logBackup(job.jobName, 'fail', err.message || err);
@@ -268,7 +277,7 @@ export const Application = () => {
                                             id="schedule"
                                             value={schedule}
                                             onChange={(_, v) => setSchedule(v)}
-                                            placeholder="e.g. 0 3 * * * (cron format)"
+                                            placeholder={_('e.g. 0 3 * * * (cron format)')}
                                         />
                                         <div style={{ fontSize: 12, color: '#666' }}>
                                             {_('Leave empty to disable scheduling.')}
@@ -415,15 +424,15 @@ export const Application = () => {
 
                         <Divider style={{ margin: '20px 0' }} />
                         <Title headingLevel="h2" size="lg">
-                            Backup History
+                            {_('Backup History')}
                         </Title>
                         <Table variant="compact" style={{ width: '100%' }}>
                             <Thead>
                                 <Tr>
-                                    <Th>Job</Th>
-                                    <Th>Status</Th>
-                                    <Th>Timestamp</Th>
-                                    <Th>Details</Th>
+                                    <Th>{_('Job Name')}</Th>
+                                    <Th>{_('Status')}</Th>
+                                    <Th>{_('Timestamp')}</Th>
+                                    <Th>{_('Details')}</Th>
                                 </Tr>
                             </Thead>
                             <Tbody>
@@ -451,7 +460,7 @@ export const Application = () => {
                         <div style={{
                             background: '#fff', padding: 32, borderRadius: 8, minWidth: 320, boxShadow: '0 2px 18px #0003'
                         }}>
-                            <h3>Config</h3>
+                            <h3>{('Config')}</h3>
                             <label style={{ display: 'block', marginBottom: 8 }}>Secret Key</label>
                             <input
                                 type="text"
@@ -464,7 +473,7 @@ export const Application = () => {
                                     variant="danger"
                                     onClick={() => setShowConfig(false)}
                                 >
-                                    Cancel
+                                    {_('Cancel')}
                                 </Button>
                                 <Button
                                     variant="primary"
@@ -472,7 +481,7 @@ export const Application = () => {
                                     onClick={async () => {
                                         await saveConfig({ secretKey: newSecret });
                                         setShowConfig(false);
-                                        showOutput('Secret updated.');
+                                        showOutput(_('Secret updated.'));
                                         loadJobs();      // reload jobs using new secret
                                     }}
                                 >

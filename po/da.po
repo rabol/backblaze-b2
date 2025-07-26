@@ -36,3 +36,123 @@ msgstr "Startskabelon"
 #: src/app.jsx:29
 msgid "Unknown"
 msgstr "Ukendt"
+
+#: src/file.js:01
+msgid "Error saving job: "
+msgstr "Fejl ved gemning af job: "
+
+#: src/file.js:01
+msgid "All fields are required."
+msgstr "Alle felter skal udfyldes."
+
+#: src/file.js:01
+msgid "'Job saved."
+msgstr "Job gemt."
+
+#: src/file.js:01
+msgid "Are you sure you want to delete this job?"
+msgstr "Er du sikker på, at du vil slette dette job?"
+
+#: src/file.js:01
+msgid "Job deleted."
+msgstr "Job slettet."
+
+#: src/file.js:01
+msgid "Are you sure you want to run this backup job?"
+msgstr "Er du sikker på, at du vil køre denne backup-job?"
+
+#: src/file.js:01
+msgid "Running backup : "
+msgstr "Kører backup: "
+
+#: src/file.js:01
+msgid "Backup failed: "
+msgstr "Backup mislykkedes: "
+
+#: src/file.js:01
+msgid "Error running job: "
+msgstr "Fejl under kørsel af job: "
+
+#: src/file.js:01
+msgid "Backblaze B2 Backup"
+msgstr "Backblaze B2 Backup"
+
+#: src/file.js:01
+msgid "Job Name"
+msgstr "Jobnavn"
+
+#: src/file.js:01
+msgid "Enter a name for this backup job"
+msgstr "Indtast et navn til denne backup-job"
+
+#: src/file.js:01
+msgid "Schedule"
+msgstr "Planlægning"
+
+#: src/file.js:01
+msgid "e.g. 0 3 * * * (cron format)"
+msgstr "f.eks. 0 3 * * * (cron-format)"
+
+#: src/file.js:01
+msgid "Leave empty to disable scheduling."
+msgstr "Lad feltet være tomt for at deaktivere planlægning."
+
+#: src/file.js:01
+msgid "Application Key ID"
+msgstr "Application Key ID"
+
+#: src/file.js:01
+msgid "Enter your Backblaze B2 Application Key ID"
+msgstr "Indtast dit Backblaze B2 Application Key ID"
+
+#: src/file.js:01
+msgid "Application Key"
+msgstr "Application Key"
+
+#: src/file.js:01
+msgid "Enter your Backblaze B2 Application Key"
+msgstr "Indtast din Backblaze B2 Application Key"
+
+#: src/file.js:01
+msgid "Bucket Name"
+msgstr "Bucket-navn"
+
+#: src/file.js:01
+msgid "Enter your Backblaze B2 Bucket Name"
+msgstr "Indtast dit Backblaze B2 Bucket-navn"
+
+#: src/file.js:01
+msgid "Folder to Backup"
+msgstr "Mappe der skal sikkerhedskopieres"
+
+#: src/file.js:01
+msgid "'Enter the folder to backup (leave empty for root)"
+msgstr "Indtast mappen der skal sikkerhedskopieres (lad være tom for rod)"
+
+#: src/file.js:01
+msgid "Save Job"
+msgstr "Gem job"
+
+#: src/file.js:01
+msgid "Cancel"
+msgstr "Annuller"
+
+#: src/file.js:01
+msgid "Saved Jobs"
+msgstr "Gemte jobs"
+
+#: src/file.js:01
+msgid "Backup History"
+msgstr "Backup-historik"
+
+#: src/file.js:01
+msgid "Status"
+msgstr "Status"
+
+#: src/file.js:01
+msgid "Timestamp"
+msgstr "Tidsstempel"
+
+#: src/file.js:01
+msgid "Details"
+msgstr "Detaljer"
