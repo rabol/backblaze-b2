@@ -77,6 +77,7 @@ export const Application = () => {
 
 
     const loadJobs = async () => {
+
         setJobs([]); // Reset jobs before loading
         try {
             const content = await cockpit.file(JOBS_FILE, { superuser: 'require' }).read();
@@ -94,6 +95,7 @@ export const Application = () => {
     };
 
     const saveJobs = async (newJobs: Job[]) => {
+
         try {
             await cockpit.file(JOBS_FILE, { superuser: 'require' }).replace(JSON.stringify(newJobs, null, 2));
             setJobs(newJobs);
@@ -103,6 +105,7 @@ export const Application = () => {
     };
 
     const handleSaveJob = async () => {
+
         if (!jobName || !keyId || !appKey || !bucket || !folder) {
             showOutput(_('All fields are required.'));
             return;
@@ -119,12 +122,7 @@ export const Application = () => {
         await saveJobs(updatedJobs);
 
         showOutput(_('Job saved.'));
-        setJobName('');
-        setKeyId('');
-        setAppKey('');
-        setBucket('');
-        setFolder('');
-        setSchedule('');
+        clearForm();
         setEditIndex(null);
     };
 
@@ -135,12 +133,17 @@ export const Application = () => {
 
     const handleCancelEdit = () => {
         setEditIndex(null);
+        clearForm();
+    };
+
+    const clearForm = () => {
         setJobName('');
         setKeyId('');
         setAppKey('');
         setBucket('');
         setFolder('');
         setSchedule('');
+        setOutput('');
     };
 
     const handleDeleteJob = async (index: number) => {
@@ -159,8 +162,8 @@ export const Application = () => {
         if (!window.confirm(_('Are you sure you want to run this backup job?')))
             return;
 
-
         setIsRunning(true);
+
         document.body.style.cursor = 'wait';
 
         try {
@@ -179,14 +182,18 @@ export const Application = () => {
                     { superuser: 'require' }
                 )
                 .done((data: string) => {
+
                     showOutput(summarizeBackupOutput(data).summary);
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
+
                 })
                 .fail((err: any) => {
+
                     showOutput(_('Backup failed: ') + (err.message || err));
                     setIsRunning(false);
                     document.body.style.cursor = 'default';
+
                 });
 
             setIsRunning(false);
@@ -196,6 +203,7 @@ export const Application = () => {
             showOutput(_('Error running job: ') + (err.message || err));
             setIsRunning(false);
             document.body.style.cursor = 'default';
+
         }
     };
 
@@ -208,7 +216,6 @@ export const Application = () => {
 
                     </CardTitle>
                     <CardBody>
-
                         {/* Show output as an Alert if present and visible */}
                         {output && showAlert && (
                             <Alert
@@ -236,6 +243,19 @@ export const Application = () => {
                                             id="jobName" value={jobName}
                                             placeholder={_('Enter a name for this backup job')}
                                             onChange={(_, v) => setJobName(v)} />
+                                    </FormGroup>
+                                </GridItem>
+                                <GridItem span={6}>
+                                    <FormGroup label={_('Schedule')} fieldId="schedule">
+                                        <TextInput
+                                            id="schedule"
+                                            value={schedule}
+                                            onChange={(_, v) => setSchedule(v)}
+                                            placeholder="e.g. 0 3 * * * (cron format)"
+                                        />
+                                        <div style={{ fontSize: 12, color: '#666' }}>
+                                            {_('Leave empty to disable scheduling.')}
+                                        </div>
                                     </FormGroup>
                                 </GridItem>
                                 <GridItem span={6}>
@@ -275,19 +295,7 @@ export const Application = () => {
                                             onChange={(_, v) => setFolder(v)} />
                                     </FormGroup>
                                 </GridItem>
-                                <GridItem span={6}>
-                                    <FormGroup label={_('Schedule')} fieldId="schedule">
-                                        <TextInput
-                                            id="schedule"
-                                            value={schedule}
-                                            onChange={(_, v) => setSchedule(v)}
-                                            placeholder="e.g. 0 3 * * * (cron format)"
-                                        />
-                                        <div style={{ fontSize: 12, color: '#666' }}>
-                                            {_('Leave empty to disable scheduling.')}
-                                        </div>
-                                    </FormGroup>
-                                </GridItem>
+
                             </Grid>
 
                             <div style={{ marginTop: '10px' }}>
@@ -315,6 +323,7 @@ export const Application = () => {
                         </Form>
 
                         <Divider style={{ margin: '20px 0' }} />
+
                         <Title headingLevel="h2" size="lg">
                             {_('Saved Jobs')}
                         </Title>
@@ -415,15 +424,12 @@ export const Application = () => {
                                 >
                                     Cancel
                                 </Button>
-
-
                                 <Button
                                     variant="primary"
                                     style={{ marginLeft: 'auto' }}
                                     onClick={async () => {
                                         await saveConfig({ secretKey: newSecret });
                                         setShowConfig(false);
-
                                         showOutput('Secret updated.');
                                         loadJobs();      // reload jobs using new secret
                                     }}
